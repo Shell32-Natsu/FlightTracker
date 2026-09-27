@@ -56,8 +56,11 @@ npm run db:generate   # 修改 src/worker/db/schema.ts 后生成新迁移
 
 ## 演示版
 
+在线演示：<https://shell32-natsu.github.io/FlightTracker/>（推送到 `main` 后由 `.github/workflows/pages.yml` 自动发布）
+
 ```bash
-npm run build:demo    # 输出 dist-demo/：纯静态，无需 Worker 和 D1
+npm run dev:demo      # 本地预览演示版，不需要 Worker 和 D1
+npm run build:demo    # 输出 dist-demo/：纯静态
 ```
 
 演示版把 `/api` 换成浏览器内的模拟实现（`src/web/lib/demoApi.ts`），带 50 段虚构航班；
