@@ -1,7 +1,8 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { ArrowLeftRight, Trash2 } from "lucide-react";
 import { useCreateFlight, useDeleteFlight, useFlights, useUpdateFlight } from "../lib/api";
-import { useRefData, type RefData } from "../lib/refdata";
+import { useRefData, useWorldTopo, type RefData } from "../lib/refdata";
 import {
   emptyForm,
   flightToForm,
@@ -10,18 +11,17 @@ import {
   type FlightFormState,
 } from "../lib/flightForm";
 import { ErrorBox, Loading } from "../components/Status";
+import { RouteGlobe } from "../components/RouteGlobe";
+import { FlightTicket, type TicketData } from "../ticket/FlightTicket";
+import { Segmented } from "../ui/Segmented";
 import { CABINS, PURPOSES, type Flight } from "../../shared/types";
 import { flightDistanceKm, flightDurationMin } from "../../shared/derive";
 import { formatDuration } from "../../shared/time";
+import { CABIN_LABEL, PURPOSE_LABEL, cityName } from "../lib/format";
+import { useUnit } from "../lib/useUnit";
 
-const CABIN_LABEL: Record<string, string> = {
-  economy: "经济舱",
-  premium: "超级经济舱",
-  business: "商务舱",
-  first: "头等舱",
-};
-const PURPOSE_LABEL: Record<string, string> = { leisure: "休闲", business: "商务", other: "其他" };
 const OFFSETS = [-1, 0, 1, 2];
+const CABIN_SHORT: Record<string, string> = { economy: "经济", premium: "超经", business: "商务", first: "头等" };
 
 export function AddFlightPage() {
   const ref = useRefData();
@@ -47,6 +47,8 @@ function FlightForm({ refData, flight }: { refData: RefData; flight?: Flight }) 
   const create = useCreateFlight();
   const update = useUpdateFlight();
   const del = useDeleteFlight();
+  const world = useWorldTopo("110m");
+  const [unit] = useUnit();
   const [form, setForm] = useState<FlightFormState>(() =>
     flight ? flightToForm(flight, refData.airports) : emptyForm(),
   );
@@ -64,16 +66,36 @@ function FlightForm({ refData, flight }: { refData: RefData; flight?: Flight }) 
     );
   }, [code]);
 
-  const dep = refData.airports[form.depAirport.toUpperCase()];
-  const arr = refData.airports[form.arrAirport.toUpperCase()];
-  const preview = (() => {
+  const depCode = form.depAirport.trim().toUpperCase();
+  const arrCode = form.arrAirport.trim().toUpperCase();
+  const dep = refData.airports[depCode];
+  const arr = refData.airports[arrCode];
+
+  const preview = useMemo(() => {
+    let min: number | null = null;
     try {
-      const input = formToInput(form, refData.airports);
-      return { km: flightDistanceKm(dep, arr), min: flightDurationMin(input) };
+      min = flightDurationMin(formToInput(form, refData.airports));
     } catch {
-      return null;
+      // 机场未填完整时忽略
     }
-  })();
+    return { km: flightDistanceKm(dep, arr), min };
+  }, [form, refData.airports, dep, arr]);
+
+  const ticket: TicketData = {
+    airline: form.airline,
+    flightNumber: form.flightNumber,
+    flightDate: form.flightDate || new Date().toISOString().slice(0, 10),
+    depAirport: dep ? depCode : "",
+    arrAirport: arr ? arrCode : "",
+    depTime: form.actualDep || form.schedDep || null,
+    arrTime: form.actualArr || form.schedArr || null,
+    arrOffset: offsetLabel(form.actualArr ? form.actualArrOffset : form.schedArrOffset),
+    durationMin: preview.min,
+    distanceKm: preview.km,
+    aircraftType: form.aircraftType || null,
+    seat: form.seat || null,
+    cabin: form.cabin || null,
+  };
 
   const busy = create.isPending || update.isPending || del.isPending;
 
@@ -97,191 +119,270 @@ function FlightForm({ refData, flight }: { refData: RefData; flight?: Flight }) 
     navigate(-1);
   };
 
+  const swap = () => setForm((f) => ({ ...f, depAirport: f.arrAirport, arrAirport: f.depAirport }));
+
   return (
-    <form className="page flight-form" onSubmit={submit}>
-      <div className="page-head">
-        <h1>{flight ? "编辑航班" : "添加航班"}</h1>
-      </div>
-
-      <fieldset>
-        <legend>航班</legend>
-        <div className="grid">
-          <Field label="航班号" hint={form.airline ? refData.airlines[form.airline]?.name : "如 UA857"}>
-            <input
-              required
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              placeholder="UA857"
-              autoCapitalize="characters"
-              autoFocus={!flight}
-            />
-          </Field>
-          <Field label="起飞日期（当地）">
-            <input type="date" required value={form.flightDate} onChange={(e) => set("flightDate", e.target.value)} />
-          </Field>
-          <Field label="出发机场" hint={airportHint(dep)}>
-            <input
-              required
-              value={form.depAirport}
-              onChange={(e) => set("depAirport", e.target.value.toUpperCase())}
-              placeholder="SFO"
-              maxLength={3}
-              autoCapitalize="characters"
-            />
-          </Field>
-          <Field label="到达机场" hint={airportHint(arr)}>
-            <input
-              required
-              value={form.arrAirport}
-              onChange={(e) => set("arrAirport", e.target.value.toUpperCase())}
-              placeholder="NRT"
-              maxLength={3}
-              autoCapitalize="characters"
-            />
-          </Field>
+    <form className="page" onSubmit={submit}>
+      <header className="page-head">
+        <div>
+          <h1 className="page-title">{flight ? "编辑航班" : "添加航班"}</h1>
+          <p className="page-sub">时间按机场当地时间填写，保存时自动换算并算好距离和时长。</p>
         </div>
-      </fieldset>
+      </header>
 
-      <fieldset>
-        <legend>时间（机场当地时间）</legend>
-        <div className="grid">
-          <Field label="计划起飞">
-            <input type="time" value={form.schedDep} onChange={(e) => set("schedDep", e.target.value)} />
-          </Field>
-          <Field label="计划到达">
-            <TimeWithOffset
-              time={form.schedArr}
-              offset={form.schedArrOffset}
-              onTime={(v) => set("schedArr", v)}
-              onOffset={(v) => set("schedArrOffset", v)}
+      <div className="form-layout">
+        <aside className="form-preview">
+          <FlightTicket data={ticket} refData={refData} unit={unit} />
+          <div className={`preview-globe${dep && arr ? " has-route" : ""}`}>
+            <RouteGlobe
+              world={world.data}
+              dep={dep ? { ...dep, code: depCode } : undefined}
+              arr={arr ? { ...arr, code: arrCode } : undefined}
             />
-          </Field>
-          <Field label="实际起飞">
-            <TimeWithOffset
-              time={form.actualDep}
-              offset={form.actualDepOffset}
-              onTime={(v) => set("actualDep", v)}
-              onOffset={(v) => set("actualDepOffset", v)}
-            />
-          </Field>
-          <Field label="实际到达">
-            <TimeWithOffset
-              time={form.actualArr}
-              offset={form.actualArrOffset}
-              onTime={(v) => set("actualArr", v)}
-              onOffset={(v) => set("actualArrOffset", v)}
-            />
-          </Field>
+            {dep && arr && (
+              <div className="caption">
+                <b>{cityName(depCode, refData)}</b> → <b>{cityName(arrCode, refData)}</b>
+                {preview.km != null && <> · {preview.km.toLocaleString()} km</>}
+              </div>
+            )}
+          </div>
+        </aside>
+
+        <div className="form-sections">
+          <section className="card form-section">
+            <h2>
+              <span className="step">1</span> 航班
+            </h2>
+            <div className="fields">
+              <Field label="航班号" hint={form.airline ? refData.airlines[form.airline]?.name : "如 MU5101、UA 857"} ok={!!form.airline}>
+                <input
+                  className="input big"
+                  required
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  placeholder="MU5101"
+                  autoCapitalize="characters"
+                  autoComplete="off"
+                  spellCheck={false}
+                  autoFocus={!flight}
+                />
+              </Field>
+              <Field label="起飞日期（当地）">
+                <input
+                  className="input big date"
+                  type="date"
+                  required
+                  value={form.flightDate}
+                  onChange={(e) => set("flightDate", e.target.value)}
+                />
+              </Field>
+              <div className="route-inputs">
+                <Field label="出发" hint={airportHint(depCode, dep)} ok={!!dep} bad={depCode.length === 3 && !dep}>
+                  <input
+                    className="input big"
+                    required
+                    value={form.depAirport}
+                    onChange={(e) => set("depAirport", e.target.value.toUpperCase())}
+                    placeholder="PVG"
+                    maxLength={3}
+                    autoCapitalize="characters"
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                </Field>
+                <button type="button" className="swap" onClick={swap} aria-label="交换出发和到达" title="交换出发和到达">
+                  <ArrowLeftRight size={15} />
+                </button>
+                <Field label="到达" hint={airportHint(arrCode, arr)} ok={!!arr} bad={arrCode.length === 3 && !arr}>
+                  <input
+                    className="input big"
+                    required
+                    value={form.arrAirport}
+                    onChange={(e) => set("arrAirport", e.target.value.toUpperCase())}
+                    placeholder="SFO"
+                    maxLength={3}
+                    autoCapitalize="characters"
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                </Field>
+              </div>
+            </div>
+          </section>
+
+          <section className="card form-section">
+            <h2>
+              <span className="step">2</span> 时间
+              <span className="hint">
+                {preview.min != null
+                  ? preview.min > 0
+                    ? `飞行 ${formatDuration(preview.min)}`
+                    : "⚠ 到达早于起飞"
+                  : "可只填计划时间"}
+              </span>
+            </h2>
+            <div className="fields times">
+              <Field label="计划起飞">
+                <input className="input" type="time" value={form.schedDep} onChange={(e) => set("schedDep", e.target.value)} />
+              </Field>
+              <Field label="计划到达">
+                <TimeWithOffset
+                  time={form.schedArr}
+                  offset={form.schedArrOffset}
+                  onTime={(v) => set("schedArr", v)}
+                  onOffset={(v) => set("schedArrOffset", v)}
+                />
+              </Field>
+              <Field label="实际起飞">
+                <TimeWithOffset
+                  time={form.actualDep}
+                  offset={form.actualDepOffset}
+                  onTime={(v) => set("actualDep", v)}
+                  onOffset={(v) => set("actualDepOffset", v)}
+                />
+              </Field>
+              <Field label="实际到达">
+                <TimeWithOffset
+                  time={form.actualArr}
+                  offset={form.actualArrOffset}
+                  onTime={(v) => set("actualArr", v)}
+                  onOffset={(v) => set("actualArrOffset", v)}
+                />
+              </Field>
+            </div>
+          </section>
+
+          <section className="card form-section">
+            <h2>
+              <span className="step">3</span> 飞机与座位
+            </h2>
+            <div className="fields cols-3">
+              <Field label="机型（ICAO）" hint={refData.aircraft[form.aircraftType.toUpperCase()]} ok>
+                <input
+                  className="input"
+                  list="aircraft-types"
+                  value={form.aircraftType}
+                  onChange={(e) => set("aircraftType", e.target.value.toUpperCase())}
+                  placeholder="B77W"
+                  maxLength={4}
+                />
+              </Field>
+              <Field label="机尾号">
+                <input
+                  className="input"
+                  value={form.registration}
+                  onChange={(e) => set("registration", e.target.value)}
+                  placeholder="B-1234"
+                />
+              </Field>
+              <Field label="座位">
+                <input className="input" value={form.seat} onChange={(e) => set("seat", e.target.value)} placeholder="32K" />
+              </Field>
+              <Field label="舱位" full>
+                <Segmented
+                  value={form.cabin || "none"}
+                  onChange={(v) => set("cabin", v === "none" ? "" : (v as FlightFormState["cabin"]))}
+                  ariaLabel="舱位"
+                  options={[
+                    { value: "none", label: "未填" },
+                    ...CABINS.map((c) => ({ value: c, label: <span title={CABIN_LABEL[c]}>{CABIN_SHORT[c]}</span> })),
+                  ]}
+                />
+              </Field>
+              <Field label="出行目的" full>
+                <Segmented
+                  value={form.purpose || "none"}
+                  onChange={(v) => set("purpose", v === "none" ? "" : (v as FlightFormState["purpose"]))}
+                  ariaLabel="出行目的"
+                  options={[
+                    { value: "none", label: "未填" },
+                    ...PURPOSES.map((p) => ({ value: p, label: PURPOSE_LABEL[p] })),
+                  ]}
+                />
+              </Field>
+              <Field label="实际承运航司" hint={refData.airlines[form.operatingAirline.toUpperCase()]?.name ?? "代码共享时填写"} ok>
+                <input
+                  className="input"
+                  value={form.operatingAirline}
+                  onChange={(e) => set("operatingAirline", e.target.value.toUpperCase())}
+                  placeholder="如 NH"
+                  maxLength={2}
+                />
+              </Field>
+              <Field label="订座记录编号">
+                <input
+                  className="input"
+                  value={form.confirmationCode}
+                  onChange={(e) => set("confirmationCode", e.target.value)}
+                  placeholder="ABC123"
+                />
+              </Field>
+              <Field label="备注" full>
+                <textarea className="input" rows={2} value={form.notes} onChange={(e) => set("notes", e.target.value)} />
+              </Field>
+            </div>
+          </section>
+
+          <datalist id="aircraft-types">
+            {Object.entries(refData.aircraft).map(([c, name]) => (
+              <option key={c} value={c}>
+                {name}
+              </option>
+            ))}
+          </datalist>
+
+          {error && <div className="error-box">{error}</div>}
+
+          <div className="form-actions">
+            {flight && (
+              <button type="button" className="button danger" onClick={remove} disabled={busy}>
+                <Trash2 size={16} /> 删除
+              </button>
+            )}
+            <span className="spacer" />
+            <button type="button" className="button ghost" onClick={() => navigate(-1)} disabled={busy}>
+              取消
+            </button>
+            <button type="submit" className="button primary" disabled={busy}>
+              {busy ? "保存中…" : flight ? "保存修改" : "保存航班"}
+            </button>
+          </div>
         </div>
-        {preview && (preview.km != null || preview.min != null) && (
-          <p className="muted small">
-            {preview.km != null && `大圆距离 ${preview.km.toLocaleString()} km`}
-            {preview.min != null && ` · 时长 ${preview.min > 0 ? formatDuration(preview.min) : "⚠ 到达早于起飞"}`}
-          </p>
-        )}
-      </fieldset>
-
-      <fieldset>
-        <legend>飞机与座位</legend>
-        <div className="grid">
-          <Field label="机型（ICAO）" hint={refData.aircraft[form.aircraftType.toUpperCase()]}>
-            <input
-              list="aircraft-types"
-              value={form.aircraftType}
-              onChange={(e) => set("aircraftType", e.target.value.toUpperCase())}
-              placeholder="B77W"
-              maxLength={4}
-            />
-          </Field>
-          <Field label="机尾号">
-            <input value={form.registration} onChange={(e) => set("registration", e.target.value)} placeholder="N2749U" />
-          </Field>
-          <Field label="实际承运航司" hint={refData.airlines[form.operatingAirline.toUpperCase()]?.name}>
-            <input
-              value={form.operatingAirline}
-              onChange={(e) => set("operatingAirline", e.target.value.toUpperCase())}
-              placeholder="代码共享时填写"
-              maxLength={2}
-            />
-          </Field>
-          <Field label="座位">
-            <input value={form.seat} onChange={(e) => set("seat", e.target.value)} placeholder="32A" />
-          </Field>
-          <Field label="舱位">
-            <select value={form.cabin} onChange={(e) => set("cabin", e.target.value as FlightFormState["cabin"])}>
-              <option value="">—</option>
-              {CABINS.map((c) => (
-                <option key={c} value={c}>
-                  {CABIN_LABEL[c]}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="目的">
-            <select
-              value={form.purpose}
-              onChange={(e) => set("purpose", e.target.value as FlightFormState["purpose"])}
-            >
-              <option value="">—</option>
-              {PURPOSES.map((p) => (
-                <option key={p} value={p}>
-                  {PURPOSE_LABEL[p]}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="订座记录编号">
-            <input
-              value={form.confirmationCode}
-              onChange={(e) => set("confirmationCode", e.target.value)}
-              placeholder="ABC123"
-            />
-          </Field>
-        </div>
-        <Field label="备注">
-          <textarea rows={2} value={form.notes} onChange={(e) => set("notes", e.target.value)} />
-        </Field>
-      </fieldset>
-
-      <datalist id="aircraft-types">
-        {Object.entries(refData.aircraft).map(([code, name]) => (
-          <option key={code} value={code}>
-            {name}
-          </option>
-        ))}
-      </datalist>
-
-      {error && <div className="status error">{error}</div>}
-
-      <div className="actions">
-        {flight && (
-          <button type="button" className="button danger" onClick={remove} disabled={busy}>
-            删除
-          </button>
-        )}
-        <span className="spacer" />
-        <button type="button" className="button" onClick={() => navigate(-1)} disabled={busy}>
-          取消
-        </button>
-        <button type="submit" className="button primary" disabled={busy}>
-          {busy ? "保存中…" : "保存"}
-        </button>
       </div>
     </form>
   );
 }
 
-function airportHint(a: RefData["airports"][string] | undefined): string | undefined {
-  if (!a) return undefined;
+function offsetLabel(o: number): string {
+  return o === 0 ? "" : o > 0 ? `+${o}` : `−${-o}`;
+}
+
+function airportHint(code: string, a: RefData["airports"][string] | undefined): string {
+  if (!code) return "三字码，如 PVG";
+  if (!a) return code.length === 3 ? "机场表里没有这个三字码" : "三字码，如 PVG";
   return a.city && !a.name.includes(a.city) ? `${a.city} · ${a.name}` : a.name;
 }
 
-function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+function Field({
+  label,
+  hint,
+  children,
+  ok,
+  bad,
+  full,
+}: {
+  label: string;
+  hint?: string;
+  children: ReactNode;
+  ok?: boolean;
+  bad?: boolean;
+  full?: boolean;
+}) {
   return (
-    <label className="field">
+    <label className={`field${full ? " full" : ""}`}>
       <span className="field-label">{label}</span>
       {children}
-      {hint && <span className="field-hint">{hint}</span>}
+      {hint !== undefined && <span className={`field-hint${bad ? " bad" : ok ? " ok" : ""}`}>{hint}</span>}
     </label>
   );
 }
@@ -294,8 +395,9 @@ function TimeWithOffset(props: {
 }) {
   return (
     <div className="time-offset">
-      <input type="time" value={props.time} onChange={(e) => props.onTime(e.target.value)} />
+      <input className="input" type="time" value={props.time} onChange={(e) => props.onTime(e.target.value)} />
       <select
+        className="select"
         aria-label="相对起飞日期"
         value={props.offset}
         onChange={(e) => props.onOffset(Number(e.target.value))}

@@ -127,3 +127,40 @@ class Counter {
     return [...this.m.values()].sort((a, b) => b.count - a.count || a.key.localeCompare(b.key));
   }
 }
+
+/** 年 × 月的航段数，用于热力图。月份按起飞当地日期。 */
+export function monthMatrix(flights: Flight[]): { years: number[]; counts: Map<number, number[]>; max: number } {
+  const counts = new Map<number, number[]>();
+  let max = 0;
+  for (const f of flights) {
+    const y = flightYear(f);
+    const m = Number(f.flightDate.slice(5, 7)) - 1;
+    const row = counts.get(y) ?? new Array<number>(12).fill(0);
+    row[m]++;
+    max = Math.max(max, row[m]);
+    counts.set(y, row);
+  }
+  return { years: [...counts.keys()].sort((a, b) => b - a), counts, max };
+}
+
+export type Haul = "short" | "medium" | "long";
+
+/** 航程分类：短程 < 1500 km ≤ 中程 < 4000 km ≤ 远程。 */
+export function haulOf(km: number): Haul {
+  return km < 1500 ? "short" : km < 4000 ? "medium" : "long";
+}
+
+export function haulBreakdown(flights: Flight[]): Record<Haul, { count: number; distanceKm: number }> {
+  const out: Record<Haul, { count: number; distanceKm: number }> = {
+    short: { count: 0, distanceKm: 0 },
+    medium: { count: 0, distanceKm: 0 },
+    long: { count: 0, distanceKm: 0 },
+  };
+  for (const f of flights) {
+    if (f.distanceKm == null) continue;
+    const h = out[haulOf(f.distanceKm)];
+    h.count++;
+    h.distanceKm += f.distanceKm;
+  }
+  return out;
+}

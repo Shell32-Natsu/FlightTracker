@@ -17,7 +17,9 @@
 
 ## 技术栈
 
-- 前端：Vite + React + TanStack Query + React Router，地图 MapLibre GL + turf，图表 Recharts
+- 前端：Vite + React + TanStack Query + React Router
+- 地图：MapLibre GL 3D 地球（globe 投影）+ turf 大圆航线，不依赖外部瓦片；表单里的小地球用 d3-geo 正射投影
+- 视觉：深色“夜航”主题，Inter 可变字体（本地打包）、lucide 图标；统计图表为手写 SVG，无图表库
 - 后端：Hono（Cloudflare Worker）、D1 + Drizzle ORM、jose 校验 Access JWT、zod 校验输入
 - 参考数据：OurAirports、OpenFlights、Natural Earth（world-atlas），由 `scripts/build-refdata.ts` 生成
 
@@ -30,7 +32,8 @@ src/
   web/         React 前端（pages / components / lib）
 scripts/       build-refdata.ts 参考数据生成脚本
 migrations/    drizzle-kit 生成的 D1 迁移
-public/refdata 前端静态参考数据（机场、国家、航司、机型、国界）
+public/refdata 前端静态参考数据（机场、国家、航司、机型、国界 50m/110m）
+public/flags   国家/地区旗帜 SVG（country-flag-icons）
 ```
 
 ## 本地开发

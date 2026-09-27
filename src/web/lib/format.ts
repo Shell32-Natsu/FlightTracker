@@ -48,3 +48,45 @@ export function localTimes(f: Flight, ref: RefData | undefined) {
     arrOffset: offset === 0 ? "" : offset > 0 ? `+${offset}` : `−${-offset}`,
   };
 }
+
+/** 数值 + 单位分开返回，便于排版（大号数字、小号单位）。 */
+export function distanceParts(km: number, unit: DistanceUnit): { value: string; unit: string } {
+  const v = unit === "km" ? km : kmToMiles(km);
+  return { value: Math.round(v).toLocaleString(), unit };
+}
+
+const dateFmt = new Intl.DateTimeFormat("zh-CN", {
+  timeZone: "UTC",
+  year: "numeric",
+  month: "long",
+  day: "numeric",
+});
+const weekdayFmt = new Intl.DateTimeFormat("zh-CN", { timeZone: "UTC", weekday: "short" });
+const shortDateFmt = new Intl.DateTimeFormat("zh-CN", { timeZone: "UTC", month: "numeric", day: "numeric" });
+
+/** "2024年7月10日"，按起飞当地日期（日期字符串本身不带时区）。 */
+export function formatDate(date: string): string {
+  return dateFmt.format(new Date(`${date}T00:00:00Z`));
+}
+
+export function formatWeekday(date: string): string {
+  return weekdayFmt.format(new Date(`${date}T00:00:00Z`));
+}
+
+export function formatShortDate(date: string): string {
+  return shortDateFmt.format(new Date(`${date}T00:00:00Z`));
+}
+
+export function cityName(code: string, ref: RefData | undefined): string {
+  const a = ref?.airports[code];
+  return a?.city ?? a?.name ?? code;
+}
+
+export const CABIN_LABEL: Record<string, string> = {
+  economy: "经济舱",
+  premium: "超级经济舱",
+  business: "商务舱",
+  first: "头等舱",
+};
+
+export const PURPOSE_LABEL: Record<string, string> = { leisure: "休闲", business: "商务", other: "其他" };

@@ -5,9 +5,10 @@
  *
  * 输出：
  *   public/refdata/*.json                   前端静态资源，加载一次常驻内存
+ *   public/flags/*.svg                      国家/地区旗帜（country-flag-icons，3:2）
  *   src/worker/refdata/airports-coords.json Worker 用的精简机场表（校验三字码、算距离）
  */
-import { mkdir, writeFile, copyFile } from "node:fs/promises";
+import { mkdir, writeFile, copyFile, access } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
 import tzlookup from "@photostructure/tz-lookup";
@@ -193,6 +194,21 @@ async function buildAircraft() {
   return { ...aircraft, ...EXTRA_AIRCRAFT };
 }
 
+async function copyFlags(codes: string[]) {
+  const out = path.join(ROOT, "public/flags");
+  await mkdir(out, { recursive: true });
+  const dir = path.join(path.dirname(require.resolve("country-flag-icons/package.json")), "3x2");
+  for (const code of codes) {
+    const src = path.join(dir, `${code}.svg`);
+    try {
+      await access(src);
+    } catch {
+      continue;
+    }
+    await copyFile(src, path.join(out, `${code}.svg`));
+  }
+}
+
 function round(n: number, digits: number) {
   const f = 10 ** digits;
   return Math.round(n * f) / f;
@@ -215,11 +231,15 @@ async function main() {
   await write(path.join(WEB_OUT, "airlines.json"), airlines);
   await write(path.join(WEB_OUT, "aircraft.json"), aircraft);
   await write(path.join(WORKER_OUT, "airports-coords.json"), coords);
-  // Natural Earth 1:50m 国界（world-atlas 已转成 TopoJSON，id 为 ISO 3166 数字码）
-  await copyFile(
-    require.resolve("world-atlas/countries-50m.json"),
-    path.join(WEB_OUT, "countries-50m.json"),
-  );
+  // Natural Earth 国界（world-atlas 已转成 TopoJSON，id 为 ISO 3166 数字码）
+  // 50m 给交互地图，110m 给表单里的小地球和导出小图
+  for (const scale of ["50m", "110m"]) {
+    await copyFile(
+      require.resolve(`world-atlas/countries-${scale}.json`),
+      path.join(WEB_OUT, `countries-${scale}.json`),
+    );
+  }
+  await copyFlags(Object.keys(countries));
 
   console.log(
     `airports ${Object.keys(airports).length}, countries ${Object.keys(countries).length}, ` +

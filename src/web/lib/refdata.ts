@@ -33,11 +33,11 @@ export function useRefData() {
   });
 }
 
-/** 国界 TopoJSON（Natural Earth 1:50m），只有地图页需要。 */
-export function useWorldTopo() {
+/** 国界 TopoJSON（Natural Earth）：50m 给交互地图，110m 给小地球预览。 */
+export function useWorldTopo(scale: "50m" | "110m" = "50m") {
   return useQuery({
-    queryKey: ["world-topo"],
-    queryFn: () => load<Topology>("countries-50m"),
+    queryKey: ["world-topo", scale],
+    queryFn: () => load<Topology>(`countries-${scale}`),
     staleTime: Infinity,
     gcTime: Infinity,
   });

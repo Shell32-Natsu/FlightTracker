@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeStats, filterFlights, routeKey } from "./stats";
+import { computeStats, filterFlights, haulBreakdown, haulOf, monthMatrix, routeKey } from "./stats";
 import type { Airport, Flight } from "./types";
 
 const ap = (country: string): Airport => ({ name: "", country, lat: 0, lon: 0, tz: "UTC" });
@@ -93,5 +93,30 @@ describe("filterFlights", () => {
     expect(filterFlights(data, { year: 2024 })).toHaveLength(3);
     expect(filterFlights(data, { year: 2024, airline: "NH" })).toHaveLength(2);
     expect(filterFlights(data, {})).toHaveLength(4);
+  });
+});
+
+describe("monthMatrix", () => {
+  it("按年、按月计数，年份倒序", () => {
+    const m = monthMatrix(data);
+    expect(m.years).toEqual([2024, 2023]);
+    expect(m.counts.get(2024)!.slice(0, 3)).toEqual([2, 1, 0]);
+    expect(m.counts.get(2023)![11]).toBe(1);
+    expect(m.max).toBe(2);
+  });
+});
+
+describe("haul", () => {
+  it("分类边界", () => {
+    expect(haulOf(1499)).toBe("short");
+    expect(haulOf(1500)).toBe("medium");
+    expect(haulOf(3999)).toBe("medium");
+    expect(haulOf(4000)).toBe("long");
+  });
+  it("汇总", () => {
+    const h = haulBreakdown(data);
+    expect(h.short.count).toBe(2);
+    expect(h.medium.count).toBe(1);
+    expect(h.long).toEqual({ count: 1, distanceKm: 8200 });
   });
 });

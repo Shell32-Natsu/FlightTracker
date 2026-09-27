@@ -1,55 +1,103 @@
-import { useEffect, useMemo, useRef } from "react";
-import { maplibregl } from "../lib/maplibre";
-import type { GeoJSONSource, StyleSpecification } from "maplibre-gl";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import type {
+  GeoJSONSource,
+  LngLatLike,
+  Map as MapLibreMap,
+  Marker,
+  StyleSpecification,
+} from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import greatCircle from "@turf/great-circle";
 import { feature } from "topojson-client";
-import type { Topology, GeometryCollection } from "topojson-specification";
+import type { GeometryCollection, Topology } from "topojson-specification";
 import type { Feature, FeatureCollection, LineString, MultiLineString, Point } from "geojson";
 import type { Flight } from "../../shared/types";
 import { routeKey } from "../../shared/stats";
+import { maplibregl } from "../lib/maplibre";
 import type { RefData } from "../lib/refdata";
 import { joinAntimeridian, unwrapGeometry } from "../lib/antimeridian";
+import { routeGradient } from "../lib/routeGradient";
+
+export type MapProjection = "globe" | "mercator";
+
+export interface FlightMapHandle {
+  resetView: () => void;
+  zoomBy: (delta: number) => void;
+}
+
+export interface RouteHover {
+  key: string;
+  x: number;
+  y: number;
+}
 
 interface Props {
   flights: Flight[];
   refData: RefData;
   world: Topology | undefined;
+  projection: MapProjection;
   selectedRoute: string | null;
   onSelectRoute: (key: string | null) => void;
+  onHoverRoute: (hover: RouteHover | null) => void;
 }
 
-const COLORS = {
-  background: "#0b1426",
-  land: "#16233d",
-  visited: "#27406b",
-  border: "#34496e",
-  route: "#f6c453",
-  routeSelected: "#ff7a59",
-  airport: "#ffffff",
-};
-
-const STYLE: StyleSpecification = {
-  version: 8,
-  sources: {},
-  layers: [{ id: "background", type: "background", paint: { "background-color": COLORS.background } }],
+const C = {
+  ocean: "#07101f",
+  land: "#111c30",
+  visited: "#1c3157",
+  border: "#1e2c47",
+  visitedBorder: "#2f4a78",
+  graticule: "rgba(140,170,220,0.06)",
+  gold: "#ffcf7a",
+  coral: "#ff7a5c",
+  selected: "#ffffff",
 };
 
 const EMPTY: FeatureCollection = { type: "FeatureCollection", features: [] };
 
-/** 交互航线地图：国家底图 + 大圆航线 + 机场点，不依赖外部瓦片。 */
-export function FlightMap({ flights, refData, world, selectedRoute, onSelectRoute }: Props) {
-  const container = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<maplibregl.Map | null>(null);
-  const loaded = useRef(false);
-  const applyData = useRef<() => void>(() => {});
-  const onSelectRef = useRef(onSelectRoute);
-  onSelectRef.current = onSelectRoute;
+const STYLE: StyleSpecification = {
+  version: 8,
+  projection: { type: "globe" },
+  sky: {
+    "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 0, 1, 4, 0.9, 7, 0],
+  },
+  sources: {},
+  layers: [{ id: "ocean", type: "background", paint: { "background-color": C.ocean } }],
+};
 
-  const { routes, airports, visitedNumeric } = useMemo(
-    () => buildLayers(flights, refData),
-    [flights, refData],
-  );
+const reducedMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+
+const easeOutCubic = (t: number) => 1 - (1 - t) ** 3;
+
+function graticule(): FeatureCollection<LineString> {
+  const features: Feature<LineString>[] = [];
+  for (let lon = -180; lon < 180; lon += 30) {
+    const coords = [];
+    for (let lat = -80; lat <= 80; lat += 2) coords.push([lon, lat]);
+    features.push({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: coords } });
+  }
+  for (let lat = -60; lat <= 60; lat += 30) {
+    const coords = [];
+    for (let lon = -180; lon <= 180; lon += 2) coords.push([lon, lat]);
+    features.push({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: coords } });
+  }
+  return { type: "FeatureCollection", features };
+}
+
+/** 交互航线地图：3D 地球 + 发光渐变航线 + 机场光点，不依赖外部瓦片。 */
+export const FlightMap = forwardRef<FlightMapHandle, Props>(function FlightMap(
+  { flights, refData, world, projection, selectedRoute, onSelectRoute, onHoverRoute },
+  handle,
+) {
+  const container = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<MapLibreMap | null>(null);
+  const [ready, setReady] = useState(false);
+  const callbacks = useRef({ onSelectRoute, onHoverRoute });
+  callbacks.current = { onSelectRoute, onHoverRoute };
+
+  const layers = useMemo(() => buildLayers(flights, refData), [flights, refData]);
+  const homeRef = useRef(layers.home);
+  homeRef.current = layers.home;
 
   const countries = useMemo<FeatureCollection>(() => {
     if (!world) return EMPTY;
@@ -59,44 +107,98 @@ export function FlightMap({ flights, refData, world, selectedRoute, onSelectRout
       features: fc.features.map((f) => ({
         ...f,
         geometry: unwrapGeometry(f.geometry),
-        properties: { ...f.properties, visited: visitedNumeric.has(String(f.id)) },
+        properties: { ...f.properties, visited: layers.visitedNumeric.has(String(f.id)) },
       })),
     };
-  }, [world, visitedNumeric]);
+  }, [world, layers.visitedNumeric]);
 
-  // 初始化地图
+  /** 以最常去的机场为中心；地球直径约占视口短边的 80%（手机上占满宽度）。 */
+  const initialView = () => {
+    const w = container.current?.clientWidth ?? 1000;
+    const h = container.current?.clientHeight ?? 800;
+    const mobile = w < 600;
+    const top = mobile ? Math.min(230, h * 0.28) : 0;
+    const bottom = mobile ? 90 : 0;
+    // 宽屏时给左上角的统计面板让出一点位置
+    const left = w >= 1200 ? 220 : 0;
+    const diameter = mobile ? Math.min(w * 0.96, h - top - bottom) : Math.min(w, h) * 0.8;
+    // 缩放级别 0 时地球周长为 512px
+    const zoom = Math.log2((diameter * Math.PI) / 512);
+    const home = homeRef.current;
+    return {
+      center: (home ? [home.lon, Math.max(-35, Math.min(45, home.lat - 6))] : [110, 20]) as LngLatLike,
+      zoom: Math.max(0, zoom),
+      padding: { top, bottom, left, right: 0 },
+    };
+  };
+
+  useImperativeHandle(handle, () => ({
+    resetView: () => mapRef.current?.flyTo({ ...initialView(), pitch: 0, bearing: 0, duration: 1600 }),
+    zoomBy: (d) => mapRef.current?.easeTo({ zoom: mapRef.current.getZoom() + d, duration: 300 }),
+  }));
+
+  // 初始化地图（只做一次）
   useEffect(() => {
+    const view = initialView();
+    const [lon, lat] = view.center as [number, number];
     const map = new maplibregl.Map({
       container: container.current!,
       style: STYLE,
-      center: [110, 25],
-      zoom: container.current!.clientWidth < 600 ? 0.4 : 1.2,
+      // 入场：从东侧转过来并略微推近
+      center: [lon + 70, lat],
+      zoom: view.zoom - 0.4,
       attributionControl: false,
       renderWorldCopies: true,
+      maxPitch: 0,
+      dragRotate: false,
+      canvasContextAttributes: { antialias: true },
     });
     mapRef.current = map;
-    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+    map.setPadding(view.padding);
     map.addControl(
       new maplibregl.AttributionControl({ compact: true, customAttribution: "Natural Earth · OurAirports" }),
+      "bottom-right",
     );
 
     map.on("load", () => {
+      // 版权信息默认收起成一个小图标
+      map.getContainer().querySelector(".maplibregl-ctrl-attrib")?.classList.remove("maplibregl-compact-show");
+      map.addSource("graticule", { type: "geojson", data: graticule() });
       map.addSource("countries", { type: "geojson", data: EMPTY });
-      map.addSource("routes", { type: "geojson", data: EMPTY });
+      map.addSource("routes", { type: "geojson", data: EMPTY, lineMetrics: true });
       map.addSource("airports", { type: "geojson", data: EMPTY });
+
+      map.addLayer({
+        id: "graticule",
+        type: "line",
+        source: "graticule",
+        paint: { "line-color": C.graticule, "line-width": 1 },
+      });
       map.addLayer({
         id: "countries-fill",
         type: "fill",
         source: "countries",
-        paint: {
-          "fill-color": ["case", ["get", "visited"], COLORS.visited, COLORS.land],
-        },
+        paint: { "fill-color": ["case", ["get", "visited"], C.visited, C.land] },
       });
       map.addLayer({
         id: "countries-line",
         type: "line",
         source: "countries",
-        paint: { "line-color": COLORS.border, "line-width": 0.5 },
+        paint: {
+          "line-color": ["case", ["get", "visited"], C.visitedBorder, C.border],
+          "line-width": ["interpolate", ["linear"], ["zoom"], 1, 0.4, 5, 1],
+        },
+      });
+      map.addLayer({
+        id: "routes-glow",
+        type: "line",
+        source: "routes",
+        layout: { "line-cap": "round", "line-join": "round" },
+        paint: {
+          "line-gradient": routeGradient(0, 0.35),
+          "line-width": ["interpolate", ["linear"], ["get", "count"], 1, 7, 8, 16],
+          "line-blur": 7,
+        },
       });
       map.addLayer({
         id: "routes-line",
@@ -104,84 +206,189 @@ export function FlightMap({ flights, refData, world, selectedRoute, onSelectRout
         source: "routes",
         layout: { "line-cap": "round", "line-join": "round" },
         paint: {
-          "line-color": ["case", ["boolean", ["get", "selected"], false], COLORS.routeSelected, COLORS.route],
-          "line-opacity": 0.85,
-          "line-width": ["interpolate", ["linear"], ["get", "count"], 1, 1.2, 10, 4],
+          "line-gradient": routeGradient(0, 1),
+          "line-width": ["interpolate", ["linear"], ["get", "count"], 1, 1.3, 8, 3.2],
         },
       });
-      // 透明的粗线，方便点中细航线
+      map.addLayer({
+        id: "routes-selected",
+        type: "line",
+        source: "routes",
+        filter: ["==", ["get", "key"], ""],
+        layout: { "line-cap": "round", "line-join": "round" },
+        paint: { "line-color": C.selected, "line-width": 2.6, "line-opacity": 0.95 },
+      });
       map.addLayer({
         id: "routes-hit",
         type: "line",
         source: "routes",
-        paint: { "line-color": "#000", "line-opacity": 0, "line-width": 12 },
+        paint: { "line-color": "#000", "line-opacity": 0, "line-width": 16 },
       });
       map.addLayer({
-        id: "airports-circle",
+        id: "airports-halo",
         type: "circle",
         source: "airports",
         paint: {
-          "circle-color": COLORS.airport,
-          "circle-stroke-color": COLORS.background,
-          "circle-stroke-width": 1,
-          "circle-radius": ["interpolate", ["linear"], ["sqrt", ["get", "count"]], 1, 2.5, 10, 9],
+          "circle-color": C.gold,
+          "circle-opacity": 0.16,
+          "circle-blur": 0.7,
+          "circle-radius": ["interpolate", ["linear"], ["sqrt", ["get", "count"]], 1, 8, 6, 20],
+          "circle-pitch-alignment": "map",
+        },
+      });
+      map.addLayer({
+        id: "airports-dot",
+        type: "circle",
+        source: "airports",
+        paint: {
+          "circle-color": "#ffffff",
+          "circle-stroke-color": C.gold,
+          "circle-stroke-width": 1.5,
+          "circle-radius": ["interpolate", ["linear"], ["sqrt", ["get", "count"]], 1, 2.4, 6, 5],
+          "circle-pitch-alignment": "map",
         },
       });
 
-      const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 8 });
-      map.on("mouseenter", "airports-circle", (e) => {
+      map.on("mousemove", "routes-hit", (e) => {
         map.getCanvas().style.cursor = "pointer";
         const f = e.features?.[0];
-        if (!f) return;
-        const p = f.properties as { code: string; name: string; count: number };
-        popup
-          .setLngLat((f.geometry as Point).coordinates as [number, number])
-          .setText(`${p.code} · ${p.name} · ${p.count} 次`)
-          .addTo(map);
+        if (f) callbacks.current.onHoverRoute({ key: String(f.properties.key), x: e.point.x, y: e.point.y });
       });
-      map.on("mouseleave", "airports-circle", () => {
+      map.on("mouseleave", "routes-hit", () => {
         map.getCanvas().style.cursor = "";
-        popup.remove();
+        callbacks.current.onHoverRoute(null);
       });
-      map.on("mouseenter", "routes-hit", () => (map.getCanvas().style.cursor = "pointer"));
-      map.on("mouseleave", "routes-hit", () => (map.getCanvas().style.cursor = ""));
       map.on("click", (e) => {
         const hit = map.queryRenderedFeatures(e.point, { layers: ["routes-hit"] })[0];
-        onSelectRef.current(hit ? String(hit.properties.key) : null);
+        callbacks.current.onSelectRoute(hit ? String(hit.properties.key) : null);
       });
 
-      loaded.current = true;
-      applyData.current();
+      setReady(true);
     });
 
     return () => {
-      loaded.current = false;
       map.remove();
       mapRef.current = null;
     };
   }, []);
 
-  // 数据变化时更新图层
+  // 投影切换
   useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-    const apply = () => {
-      (map.getSource("countries") as GeoJSONSource | undefined)?.setData(countries);
-      (map.getSource("airports") as GeoJSONSource | undefined)?.setData(airports);
-      (map.getSource("routes") as GeoJSONSource | undefined)?.setData({
-        ...routes,
-        features: routes.features.map((f) => ({
-          ...f,
-          properties: { ...f.properties, selected: f.properties?.key === selectedRoute },
-        })),
-      });
+    if (!ready) return;
+    mapRef.current!.setProjection({ type: projection });
+  }, [projection, ready]);
+
+  // 国界
+  useEffect(() => {
+    if (!ready) return;
+    (mapRef.current!.getSource("countries") as GeoJSONSource).setData(countries);
+  }, [countries, ready]);
+
+  // 航线和机场：更新数据并播放入场动画
+  const firstDraw = useRef(true);
+  useEffect(() => {
+    if (!ready) return;
+    const map = mapRef.current!;
+    (map.getSource("routes") as GeoJSONSource).setData(layers.routes);
+    (map.getSource("airports") as GeoJSONSource).setData(layers.airports);
+
+    const drawMs = reducedMotion() ? 0 : 2000;
+    if (firstDraw.current) {
+      firstDraw.current = false;
+      map.easeTo({ ...initialView(), duration: drawMs ? drawMs + 400 : 0, easing: easeOutCubic });
+    }
+
+    let raf = 0;
+    const start = performance.now();
+    const step = (now: number) => {
+      const t = drawMs ? Math.min(1, (now - start) / drawMs) : 1;
+      const p = easeOutCubic(t);
+      map.setPaintProperty("routes-line", "line-gradient", routeGradient(p, 1));
+      map.setPaintProperty("routes-glow", "line-gradient", routeGradient(p, 0.35));
+      if (t < 1) raf = requestAnimationFrame(step);
     };
-    applyData.current = apply;
-    if (loaded.current) apply();
-  }, [countries, routes, airports, selectedRoute]);
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [layers, ready]);
+
+  // 选中航线：高亮并把镜头移过去（给详情面板留出位置）
+  useEffect(() => {
+    if (!ready) return;
+    const map = mapRef.current!;
+    map.setFilter("routes-selected", ["==", ["get", "key"], selectedRoute ?? ""]);
+    const route = selectedRoute && layers.routes.features.find((f) => f.properties?.key === selectedRoute);
+    if (!route) return;
+    const bounds = new maplibregl.LngLatBounds();
+    for (const c of route.geometry.coordinates) bounds.extend(c as [number, number]);
+    const w = map.getContainer().clientWidth;
+    const h = map.getContainer().clientHeight;
+    const mobile = w < 900;
+    map.fitBounds(bounds, {
+      padding: mobile
+        ? { top: Math.min(260, h * 0.3), bottom: h * 0.5 + 20, left: 40, right: 40 }
+        : { top: 120, bottom: 80, left: w >= 1200 ? 340 : 80, right: 520 },
+      maxZoom: 5,
+      duration: reducedMotion() ? 0 : 1400,
+      essential: true,
+    });
+    // 只在选中变化时移动镜头；航线数据变化不重新定位
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedRoute, ready]);
+
+  // 机场三字码标签：HTML Marker + 简单的碰撞避让（到访次数多的优先）
+  useEffect(() => {
+    if (!ready) return;
+    const map = mapRef.current!;
+    const items = layers.airports.features
+      .map((f) => {
+        // Marker 自己会改根元素的 opacity（被地球挡住时），碰撞避让改内层元素
+        const el = document.createElement("div");
+        const label = document.createElement("span");
+        const p = f.properties as { code: string; count: number; home: boolean };
+        label.className = `airport-label${p.home ? " home" : ""}`;
+        label.textContent = p.code;
+        el.appendChild(label);
+        if (p.home) {
+          const pulse = document.createElement("span");
+          pulse.className = "home-pulse";
+          el.appendChild(pulse);
+        }
+        const marker: Marker = new maplibregl.Marker({ element: el, anchor: "bottom", opacityWhenCovered: "0" })
+          .setLngLat(f.geometry.coordinates as [number, number])
+          .addTo(map);
+        return { el: label, marker, count: p.count, lngLat: marker.getLngLat() };
+      })
+      .sort((a, b) => b.count - a.count);
+
+    let raf = 0;
+    const layout = () => {
+      raf = 0;
+      const placed: { x: number; y: number }[] = [];
+      const transform = (map as unknown as { transform?: { isLocationOccluded?: (l: unknown) => boolean } })
+        .transform;
+      for (const it of items) {
+        const pt = map.project(it.lngLat);
+        const occluded = transform?.isLocationOccluded?.(it.lngLat) ?? false;
+        const clash = placed.some((p) => Math.abs(p.x - pt.x) < 40 && Math.abs(p.y - pt.y) < 22);
+        const show = !occluded && !clash;
+        it.el.classList.toggle("hidden", !show);
+        if (show) placed.push(pt);
+      }
+    };
+    const schedule = () => {
+      if (!raf) raf = requestAnimationFrame(layout);
+    };
+    layout();
+    map.on("move", schedule);
+    return () => {
+      map.off("move", schedule);
+      cancelAnimationFrame(raf);
+      items.forEach((it) => it.marker.remove());
+    };
+  }, [layers, ready]);
 
   return <div ref={container} className="flight-map" />;
-}
+});
 
 function buildLayers(flights: Flight[], refData: RefData) {
   const routeCount = new Map<string, { a: string; b: string; count: number }>();
@@ -205,7 +412,7 @@ function buildLayers(flights: Flight[], refData: RefData) {
     const a = refData.airports[r.a];
     const b = refData.airports[r.b];
     if (!a || !b) continue;
-    const line = greatCircle([a.lon, a.lat], [b.lon, b.lat], { npoints: 128 }) as Feature<
+    const line = greatCircle([a.lon, a.lat], [b.lon, b.lat], { npoints: 160 }) as Feature<
       LineString | MultiLineString
     >;
     line.properties = { key, count: r.count };
@@ -213,6 +420,10 @@ function buildLayers(flights: Flight[], refData: RefData) {
   }
   // 常飞航线画在上层
   routes.features.sort((x, y) => x.properties!.count - y.properties!.count);
+
+  let homeCode: string | null = null;
+  for (const [code, n] of airportCount) if (!homeCode || n > airportCount.get(homeCode)!) homeCode = code;
+  const home = homeCode ? refData.airports[homeCode] : undefined;
 
   const airports: FeatureCollection<Point> = {
     type: "FeatureCollection",
@@ -223,10 +434,10 @@ function buildLayers(flights: Flight[], refData: RefData) {
         return {
           type: "Feature",
           geometry: { type: "Point", coordinates: [a.lon, a.lat] },
-          properties: { code, name: a.city ?? a.name, count },
+          properties: { code, name: a.city ?? a.name, count, home: code === homeCode },
         };
       }),
   };
 
-  return { routes, airports, visitedNumeric };
+  return { routes, airports, visitedNumeric, home };
 }

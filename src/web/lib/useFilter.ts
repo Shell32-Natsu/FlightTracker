@@ -1,3 +1,4 @@
+import { useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { FlightFilter } from "../../shared/stats";
 
@@ -6,17 +7,26 @@ export function useFilter(): [FlightFilter, (f: FlightFilter) => void] {
   const [params, setParams] = useSearchParams();
   const year = params.get("year");
   const airline = params.get("airline");
-  const filter: FlightFilter = {
-    year: year ? Number(year) : undefined,
-    airline: airline ?? undefined,
-  };
-  const setFilter = (f: FlightFilter) => {
-    const next = new URLSearchParams(params);
-    for (const [k, v] of Object.entries(f)) {
-      if (v === undefined || v === "") next.delete(k);
-      else next.set(k, String(v));
-    }
-    setParams(next, { replace: true });
-  };
+  // 引用保持稳定，否则下游 useMemo（航线图层、统计）每次渲染都会重算
+  const filter = useMemo<FlightFilter>(
+    () => ({ year: year ? Number(year) : undefined, airline: airline ?? undefined }),
+    [year, airline],
+  );
+  const setFilter = useCallback(
+    (f: FlightFilter) => {
+      setParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          for (const [k, v] of Object.entries(f)) {
+            if (v === undefined || v === "") next.delete(k);
+            else next.set(k, String(v));
+          }
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setParams],
+  );
   return [filter, setFilter];
 }

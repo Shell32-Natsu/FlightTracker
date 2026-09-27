@@ -1,14 +1,16 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { Globe, LocateFixed, Map as MapIcon, Minus, Plus, X } from "lucide-react";
 import { useFlights } from "../lib/api";
 import { useRefData, useWorldTopo } from "../lib/refdata";
 import { useFilter } from "../lib/useFilter";
 import { useUnit } from "../lib/useUnit";
 import { computeStats, filterFlights, routeKey } from "../../shared/stats";
-import { FilterBar } from "../components/FilterBar";
-import { FlightMap } from "../components/FlightMap";
-import { FlightRow } from "../components/FlightRow";
-import { formatDistance } from "../lib/format";
-import { Loading, ErrorBox } from "../components/Status";
+import { FlightMap, type FlightMapHandle, type MapProjection, type RouteHover } from "../components/FlightMap";
+import { Starfield } from "../components/Starfield";
+import { FlightTicket, ticketFromFlight } from "../ticket/FlightTicket";
+import { YearFilter } from "../ui/YearFilter";
+import { cityName, distanceParts } from "../lib/format";
+import { ErrorBox, Loading } from "../components/Status";
 
 export function MapPage() {
   const flights = useFlights();
@@ -17,60 +19,140 @@ export function MapPage() {
   const [filter, setFilter] = useFilter();
   const [unit] = useUnit();
   const [selected, setSelected] = useState<string | null>(null);
+  const [hover, setHover] = useState<RouteHover | null>(null);
+  const [projection, setProjection] = useState<MapProjection>("globe");
+  const mapHandle = useRef<FlightMapHandle>(null);
 
   const all = flights.data ?? [];
   const shown = useMemo(() => filterFlights(all, filter), [all, filter]);
   const stats = useMemo(() => (ref.data ? computeStats(shown, ref.data.airports) : null), [shown, ref.data]);
-  const selectedFlights = useMemo(
-    () => (selected ? shown.filter((f) => routeKey(f.depAirport, f.arrAirport) === selected) : []),
-    [shown, selected],
-  );
+  const byRoute = useMemo(() => {
+    const m = new Map<string, typeof shown>();
+    for (const f of shown) {
+      const k = routeKey(f.depAirport, f.arrAirport);
+      m.set(k, [...(m.get(k) ?? []), f]);
+    }
+    return m;
+  }, [shown]);
+  const selectedFlights = selected ? (byRoute.get(selected) ?? []) : [];
 
   if (flights.error) return <ErrorBox error={flights.error} />;
   if (ref.error) return <ErrorBox error={ref.error} />;
-  if (!ref.data || flights.isPending) return <Loading />;
+  if (!ref.data || flights.isPending) return <Loading label="正在准备地图" />;
+
+  const dist = distanceParts(stats?.distanceKm ?? 0, unit);
+  const hovered = hover ? byRoute.get(hover.key) : undefined;
+  const [ha, hb] = selected?.split("-") ?? [];
 
   return (
     <div className="map-page">
-      <div className="map-overlay">
-        <FilterBar flights={all} filter={filter} onChange={setFilter} refData={ref.data} />
-        {stats && (
-          <div className="map-summary">
-            <span>
-              <b>{stats.flights}</b> 航段
-            </span>
-            <span>
-              <b>{formatDistance(stats.distanceKm, unit)}</b>
-            </span>
-            <span>
-              <b>{stats.airports.length}</b> 机场
-            </span>
-            <span>
-              <b>{stats.countries.length}</b> 国家/地区
-            </span>
-          </div>
-        )}
-      </div>
+      <Starfield />
       <FlightMap
+        ref={mapHandle}
         flights={shown}
         refData={ref.data}
         world={world.data}
+        projection={projection}
         selectedRoute={selected}
         onSelectRoute={setSelected}
+        onHoverRoute={setHover}
       />
-      {selectedFlights.length > 0 && (
-        <div className="route-sheet">
-          <div className="route-sheet-head">
-            <b>{selected}</b> · {selectedFlights.length} 次
-            <button className="link" onClick={() => setSelected(null)}>
-              关闭
-            </button>
+
+      <div className="hud">
+        <div className="hud-card glass">
+          <div className="eyebrow">{filter.year ? `${filter.year} 年飞行` : "飞行足迹"}</div>
+          <div className="hud-hero">
+            <span className="value">{dist.value}</span>
+            <span className="unit">{dist.unit}</span>
           </div>
-          {selectedFlights.map((f) => (
-            <FlightRow key={f.id} flight={f} refData={ref.data} unit={unit} to={`/flights/${f.id}`} />
-          ))}
+          <div className="hud-stats">
+            <HudStat v={stats?.flights ?? 0} l="航段" />
+            <HudStat v={stats?.airports.length ?? 0} l="机场" />
+            <HudStat v={stats?.countries.length ?? 0} l="国家/地区" />
+            <HudStat v={Math.round((stats?.durationMin ?? 0) / 60)} l="小时" />
+          </div>
+        </div>
+        {all.length > 0 && (
+          <div className="hud-filters">
+            <YearFilter
+              flights={all}
+              filter={filter}
+              onChange={(f) => {
+                setSelected(null);
+                setFilter(f);
+              }}
+              refData={ref.data}
+            />
+          </div>
+        )}
+      </div>
+
+      <div className="map-controls glass">
+        <button
+          aria-label={projection === "globe" ? "切换为平面地图" : "切换为地球"}
+          title={projection === "globe" ? "平面地图" : "地球"}
+          onClick={() => setProjection(projection === "globe" ? "mercator" : "globe")}
+        >
+          {projection === "globe" ? <MapIcon size={18} /> : <Globe size={18} />}
+        </button>
+        <button aria-label="回到初始视角" title="回到初始视角" onClick={() => mapHandle.current?.resetView()}>
+          <LocateFixed size={18} />
+        </button>
+        <button className="zoom" aria-label="放大" onClick={() => mapHandle.current?.zoomBy(1)}>
+          <Plus size={18} />
+        </button>
+        <button className="zoom" aria-label="缩小" onClick={() => mapHandle.current?.zoomBy(-1)}>
+          <Minus size={18} />
+        </button>
+      </div>
+
+      {hover && hovered && hover.key !== selected && (
+        <div className="map-tooltip glass" style={{ left: hover.x, top: hover.y }}>
+          <b>{hover.key.replace("-", " ⇄ ")}</b>
+          <span className="faint">
+            {hovered.length} 次 · {distanceParts(hovered[0].distanceKm ?? 0, unit).value} {unit}
+          </span>
         </div>
       )}
+
+      {selected && selectedFlights.length > 0 && (
+        <aside className="route-panel glass" aria-label="航线详情">
+          <div className="route-panel-head">
+            <div>
+              <div className="route-title">
+                {ha} ⇄ {hb}
+              </div>
+              <div className="route-sub">
+                {cityName(ha, ref.data)} – {cityName(hb, ref.data)} · 飞过 {selectedFlights.length} 次
+              </div>
+            </div>
+            <button className="button ghost icon" aria-label="关闭" onClick={() => setSelected(null)}>
+              <X size={18} />
+            </button>
+          </div>
+          <div className="route-panel-body">
+            {selectedFlights.map((f) => (
+              <FlightTicket
+                key={f.id}
+                data={ticketFromFlight(f, ref.data)}
+                refData={ref.data}
+                unit={unit}
+                to={`/flights/${f.id}`}
+                compact
+              />
+            ))}
+          </div>
+        </aside>
+      )}
+    </div>
+  );
+}
+
+function HudStat({ v, l }: { v: number; l: string }) {
+  return (
+    <div className="hud-stat">
+      <div className="v">{v.toLocaleString()}</div>
+      <div className="l">{l}</div>
     </div>
   );
 }

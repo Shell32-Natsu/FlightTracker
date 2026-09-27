@@ -1,183 +1,627 @@
 import { useMemo, useState } from "react";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Link } from "react-router-dom";
+import {
+  Building2,
+  ChartColumn,
+  Clock3,
+  Flag as FlagIcon,
+  MapPin,
+  Moon,
+  Orbit,
+  Plane,
+  PlaneTakeoff,
+  Repeat,
+  Ruler,
+  Table2,
+  Timer,
+  TrendingDown,
+  TrendingUp,
+} from "lucide-react";
 import { useFlights } from "../lib/api";
 import { useRefData, type RefData } from "../lib/refdata";
 import { useFilter } from "../lib/useFilter";
 import { useUnit } from "../lib/useUnit";
-import { computeStats, filterFlights, type Ranked } from "../../shared/stats";
+import {
+  computeStats,
+  filterFlights,
+  haulBreakdown,
+  monthMatrix,
+  type Haul,
+  type Ranked,
+} from "../../shared/stats";
 import { kmToMiles } from "../../shared/geo";
-import { FilterBar } from "../components/FilterBar";
-import { FlightRow } from "../components/FlightRow";
+import type { Flight } from "../../shared/types";
+import { ColumnChart, type Column } from "../charts/ColumnChart";
+import { MonthHeatmap } from "../charts/MonthHeatmap";
+import { FlightTicket, ticketFromFlight } from "../ticket/FlightTicket";
+import { YearFilter } from "../ui/YearFilter";
+import { Segmented } from "../ui/Segmented";
+import { AirlineBadge } from "../ui/AirlineBadge";
+import { Flag } from "../ui/Flag";
 import { Empty, ErrorBox, Loading } from "../components/Status";
 import {
+  CABIN_LABEL,
   aircraftName,
   airlineName,
-  airportLabel,
+  cityName,
   countryName,
-  formatDistance,
-  formatHours,
+  distanceParts,
   type DistanceUnit,
 } from "../lib/format";
 
+const EARTH_KM = 40_075;
+const MOON_KM = 384_400;
+
 type Metric = "flights" | "distance" | "hours";
-const METRIC_LABEL: Record<Metric, string> = { flights: "航段", distance: "里程", hours: "小时" };
 
 export function StatsPage() {
   const flights = useFlights();
   const ref = useRefData();
   const [filter, setFilter] = useFilter();
   const [unit, setUnit] = useUnit();
-  const [metric, setMetric] = useState<Metric>("flights");
 
   const all = flights.data ?? [];
   const shown = useMemo(() => filterFlights(all, filter), [all, filter]);
   const stats = useMemo(() => (ref.data ? computeStats(shown, ref.data.airports) : null), [shown, ref.data]);
+  // 选中某一年时，与上一年同口径（同一航司筛选）比较里程
+  const prevKm = useMemo(() => {
+    if (filter.year === undefined) return undefined;
+    const prev = filterFlights(all, { ...filter, year: filter.year - 1 });
+    return prev.length ? prev.reduce((s, f) => s + (f.distanceKm ?? 0), 0) : undefined;
+  }, [all, filter]);
 
   if (flights.error) return <ErrorBox error={flights.error} />;
   if (ref.error) return <ErrorBox error={ref.error} />;
   if (!stats || !ref.data) return <Loading />;
 
-  const yearData = stats.years.map((y) => ({
-    year: String(y.year),
-    value:
-      metric === "flights"
-        ? y.flights
-        : metric === "hours"
-          ? Math.round(y.durationMin / 60)
-          : Math.round(unit === "km" ? y.distanceKm : kmToMiles(y.distanceKm)),
-  }));
+  const years = stats.years.map((y) => y.year);
+  const span = years.length ? (years[0] === years.at(-1) ? `${years[0]}` : `${years[0]} – ${years.at(-1)}`) : "";
 
   return (
     <div className="page">
-      <div className="page-head">
-        <h1>统计</h1>
-        <div className="segmented">
-          {(["km", "mi"] as DistanceUnit[]).map((u) => (
-            <button key={u} className={u === unit ? "on" : ""} onClick={() => setUnit(u)}>
-              {u === "km" ? "公里" : "英里"}
-            </button>
-          ))}
+      <header className="page-head">
+        <div>
+          <h1 className="page-title">统计</h1>
+          <p className="page-sub">
+            {stats.flights ? `${span} · ${stats.flights} 段航班` : "添加航班后，这里会出现你的飞行数据"}
+          </p>
         </div>
-      </div>
-      <FilterBar flights={all} filter={filter} onChange={setFilter} refData={ref.data} />
+        <Segmented
+          value={unit}
+          onChange={setUnit}
+          size="sm"
+          ariaLabel="距离单位"
+          options={[
+            { value: "km", label: "公里" },
+            { value: "mi", label: "英里" },
+          ]}
+        />
+      </header>
+
+      {all.length > 0 && (
+        <div className="filter-row">
+          <YearFilter flights={all} filter={filter} onChange={setFilter} refData={ref.data} />
+        </div>
+      )}
 
       {stats.flights === 0 ? (
-        <Empty>没有符合条件的航班。</Empty>
+        all.length === 0 ? (
+          <Empty
+            title="还没有数据"
+            action={
+              <Link to="/add" className="button primary">
+                添加航班
+              </Link>
+            }
+          >
+            记录几段航班后，这里会出现里程、时长、常去的机场和航线。
+          </Empty>
+        ) : (
+          <Empty title="没有符合条件的航班">换个年份或航司看看。</Empty>
+        )
       ) : (
-        <>
-          <div className="kpis">
-            <Kpi label="航段" value={stats.flights.toLocaleString()} />
-            <Kpi label="里程" value={formatDistance(stats.distanceKm, unit)} />
-            <Kpi label="飞行时长" value={formatHours(stats.durationMin)} />
-            <Kpi label="机场" value={stats.airports.length} />
-            <Kpi label="国家/地区" value={stats.countries.length} />
-            <Kpi label="航司" value={stats.airlines.length} />
-            <Kpi
-              label="绕地球"
-              value={`${(stats.distanceKm / 40075).toFixed(1)} 圈`}
-            />
-          </div>
-
-          {stats.years.length > 1 && (
-            <section className="card">
-              <div className="card-head">
-                <h2>按年</h2>
-                <div className="segmented">
-                  {(Object.keys(METRIC_LABEL) as Metric[]).map((m) => (
-                    <button key={m} className={m === metric ? "on" : ""} onClick={() => setMetric(m)}>
-                      {METRIC_LABEL[m]}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="chart">
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={yearData} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}>
-                    <CartesianGrid vertical={false} stroke="var(--grid)" />
-                    <XAxis dataKey="year" tickLine={false} axisLine={false} tick={{ fill: "var(--muted)", fontSize: 12 }} />
-                    <YAxis tickLine={false} axisLine={false} tick={{ fill: "var(--muted)", fontSize: 12 }} />
-                    <Tooltip
-                      cursor={{ fill: "var(--hover)" }}
-                      contentStyle={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8 }}
-                      formatter={(v) => [
-                        Number(v).toLocaleString(),
-                        metric === "distance" ? unit : METRIC_LABEL[metric],
-                      ]}
-                    />
-                    <Bar dataKey="value" fill="var(--accent)" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </section>
-          )}
-
-          <div className="rank-grid">
-            <RankList title="航司" items={stats.airlines} label={(k) => `${k} · ${airlineName(k, ref.data)}`} />
-            <RankList title="机型" items={stats.aircraft} label={(k) => `${k} · ${aircraftName(k, ref.data)}`} />
-            <RankList title="机场" items={stats.airports} label={(k) => `${k} · ${airportLabel(k, ref.data)}`} />
-            <RankList title="航线" items={stats.routes} label={(k) => routeLabel(k, ref.data)} />
-            <RankList title="国家/地区" items={stats.countries} label={(k) => countryName(k, ref.data)} />
-          </div>
-
-          <section className="card">
-            <h2>最长与最短</h2>
-            {stats.longest && (
-              <>
-                <p className="muted small">最长</p>
-                <FlightRow flight={stats.longest} refData={ref.data} unit={unit} to={`/flights/${stats.longest.id}`} />
-              </>
-            )}
-            {stats.shortest && stats.shortest !== stats.longest && (
-              <>
-                <p className="muted small">最短</p>
-                <FlightRow flight={stats.shortest} refData={ref.data} unit={unit} to={`/flights/${stats.shortest.id}`} />
-              </>
-            )}
-          </section>
-        </>
+        <StatsBody flights={shown} stats={stats} refData={ref.data} unit={unit} year={filter.year} prevKm={prevKm} />
       )}
     </div>
   );
 }
 
-function routeLabel(key: string, ref: RefData | undefined) {
-  const [a, b] = key.split("-");
-  return `${a} ⇄ ${b} · ${airportLabel(a, ref)} – ${airportLabel(b, ref)}`;
+function StatsBody({
+  flights,
+  stats,
+  refData,
+  unit,
+  year,
+  prevKm,
+}: {
+  flights: Flight[];
+  stats: NonNullable<ReturnType<typeof computeStats>>;
+  refData: RefData;
+  unit: DistanceUnit;
+  year: number | undefined;
+  prevKm: number | undefined;
+}) {
+  const delta = prevKm ? (stats.distanceKm - prevKm) / prevKm : undefined;
+  const dist = distanceParts(stats.distanceKm, unit);
+  const hours = stats.durationMin / 60;
+  const avg = distanceParts(stats.distanceKm / stats.flights, unit);
+  const matrix = useMemo(() => monthMatrix(flights), [flights]);
+  const hauls = useMemo(() => haulBreakdown(flights), [flights]);
+  const cabins = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const f of flights) if (f.cabin) m.set(f.cabin, (m.get(f.cabin) ?? 0) + 1);
+    return m;
+  }, [flights]);
+
+  return (
+    <>
+      <div className="stats-hero">
+        <section className="card hero-card">
+          <HeroArc />
+          <div className="eyebrow">{year ? `${year} 年飞行里程` : "累计飞行里程"}</div>
+          <div className="hero-figure">
+            <span className="value">{dist.value}</span>
+            <span className="unit">{dist.unit}</span>
+          </div>
+          {delta !== undefined && year !== undefined && (
+            <div className="hero-delta">
+              {delta >= 0 ? <TrendingUp size={15} /> : <TrendingDown size={15} />}
+              较 {year - 1} 年 {delta >= 0 ? "+" : "−"}
+              {Math.abs(Math.round(delta * 100))}%
+            </div>
+          )}
+          <div className="hero-facts">
+            <span className="fact">
+              <Orbit size={15} /> 绕地球 <b>{(stats.distanceKm / EARTH_KM).toFixed(1)}</b> 圈
+            </span>
+            <span className="fact">
+              <Moon size={15} /> 地月距离的 <b>{Math.round((stats.distanceKm / MOON_KM) * 100)}%</b>
+            </span>
+            <span className="fact">
+              <Timer size={15} /> 空中 <b>{(hours / 24).toFixed(1)}</b> 天
+            </span>
+          </div>
+        </section>
+
+        <div className="tiles">
+          <Tile icon={<PlaneTakeoff size={14} />} label="航段" value={stats.flights} sub={`平均 ${avg.value} ${avg.unit}`} />
+          <Tile
+            icon={<Clock3 size={14} />}
+            label="飞行时长"
+            value={Math.round(hours).toLocaleString()}
+            unit="小时"
+            sub={`平均 ${Math.round(stats.durationMin / stats.flights / 6) / 10} 小时/段`}
+          />
+          <Tile icon={<MapPin size={14} />} label="机场" value={stats.airports.length} sub={topName(stats.airports, (k) => `${k} 最常去`)} />
+          <Tile
+            icon={<FlagIcon size={14} />}
+            label="国家/地区"
+            value={stats.countries.length}
+            sub={topName(stats.countries, (k) => countryName(k, refData))}
+          />
+          <Tile
+            icon={<Building2 size={14} />}
+            label="航司"
+            value={stats.airlines.length}
+            sub={topName(stats.airlines, (k) => airlineName(k, refData))}
+          />
+          <Tile
+            icon={<Plane size={14} />}
+            label="机型"
+            value={stats.aircraft.length}
+            sub={topName(stats.aircraft, (k) => aircraftName(k, refData))}
+          />
+        </div>
+      </div>
+
+      <div className="stats-grid">
+        <TimeChart flights={flights} stats={stats} unit={unit} year={year} />
+
+        <section className="card wide">
+          <div className="card-head">
+            <h2 className="section-title">
+              出行月份 <span className="count">每格为当月航段数</span>
+            </h2>
+          </div>
+          <MonthHeatmap years={matrix.years} counts={matrix.counts} max={matrix.max} />
+        </section>
+
+        <RankCard
+          title="常飞航线"
+          items={stats.routes}
+          leadWidth={80}
+          lead={(k) => <span className="iata-chip">{k.replace("-", "⇄")}</span>}
+          label={(k) => {
+            const [a, b] = k.split("-");
+            return `${cityName(a, refData)} – ${cityName(b, refData)}`;
+          }}
+        />
+        <RankCard
+          title="机场"
+          items={stats.airports}
+          leadWidth={40}
+          lead={(k) => <span className="iata-chip">{k}</span>}
+          label={(k) => refData.airports[k]?.name ?? k}
+        />
+        <RankCard
+          title="航司"
+          items={stats.airlines}
+          leadWidth={26}
+          lead={(k) => <AirlineBadge code={k} size="sm" />}
+          label={(k) => airlineName(k, refData)}
+        />
+        <RankCard
+          title="机型"
+          items={stats.aircraft}
+          leadWidth={44}
+          lead={(k) => <span className="iata-chip">{k}</span>}
+          label={(k) => aircraftName(k, refData)}
+        />
+
+        <section className="card">
+          <div className="card-head">
+            <h2 className="section-title">航程分布</h2>
+          </div>
+          <div className="haul-list">
+            {(
+              [
+                ["short", "短程", "< 1,500 km"],
+                ["medium", "中程", "1,500 – 4,000 km"],
+                ["long", "远程", "≥ 4,000 km"],
+              ] as [Haul, string, string][]
+            ).map(([k, name, range]) => (
+              <ShareRow key={k} name={name} note={range} count={hauls[k].count} total={stats.flights} />
+            ))}
+          </div>
+        </section>
+
+        <section className="card">
+          <div className="card-head">
+            <h2 className="section-title">
+              舱位 <span className="count">{[...cabins.values()].reduce((a, b) => a + b, 0)} 段有记录</span>
+            </h2>
+          </div>
+          <div className="haul-list">
+            {["economy", "premium", "business", "first"].map((c) => (
+              <ShareRow
+                key={c}
+                name={CABIN_LABEL[c]}
+                count={cabins.get(c) ?? 0}
+                total={[...cabins.values()].reduce((a, b) => a + b, 0) || 1}
+              />
+            ))}
+          </div>
+        </section>
+
+        <section className="card wide">
+          <div className="card-head">
+            <h2 className="section-title">
+              去过的国家和地区 <span className="count">{stats.countries.length}</span>
+            </h2>
+          </div>
+          <div className="country-grid">
+            {stats.countries.map((c) => (
+              <div className="country" key={c.key}>
+                <Flag code={c.key} size={16} />
+                <span className="name">{countryName(c.key, refData)}</span>
+                <span className="n">{c.count}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="card wide">
+          <div className="card-head">
+            <h2 className="section-title">飞行纪录</h2>
+          </div>
+          <div className="records">
+            {stats.longest && (
+              <div>
+                <div className="record-label">
+                  <Ruler size={13} /> 最长航段
+                </div>
+                <FlightTicket
+                  data={ticketFromFlight(stats.longest, refData)}
+                  refData={refData}
+                  unit={unit}
+                  to={`/flights/${stats.longest.id}`}
+                  compact
+                />
+              </div>
+            )}
+            {stats.shortest && stats.shortest !== stats.longest && (
+              <div>
+                <div className="record-label">
+                  <Ruler size={13} /> 最短航段
+                </div>
+                <FlightTicket
+                  data={ticketFromFlight(stats.shortest, refData)}
+                  refData={refData}
+                  unit={unit}
+                  to={`/flights/${stats.shortest.id}`}
+                  compact
+                />
+              </div>
+            )}
+            {stats.routes[0] && stats.routes[0].count > 1 && (
+              <div>
+                <div className="record-label">
+                  <Repeat size={13} /> 飞得最多的航线
+                </div>
+                <div className="record-card">
+                  <b>{stats.routes[0].key.replace("-", " ⇄ ")}</b>
+                  <span>
+                    {stats.routes[0].count} 次 ·{" "}
+                    {stats.routes[0].key
+                      .split("-")
+                      .map((c) => cityName(c, refData))
+                      .join(" – ")}
+                  </span>
+                </div>
+              </div>
+            )}
+            {stats.aircraft[0] && (
+              <div>
+                <div className="record-label">
+                  <Plane size={13} /> 坐得最多的机型
+                </div>
+                <div className="record-card">
+                  <b>{aircraftName(stats.aircraft[0].key, refData)}</b>
+                  <span>
+                    {stats.aircraft[0].count} 次 · {stats.aircraft[0].key}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+      </div>
+    </>
+  );
 }
 
-function Kpi({ label, value }: { label: string; value: string | number }) {
+function topName(items: Ranked[], name: (k: string) => string): string {
+  return items[0] ? name(items[0].key) : "—";
+}
+
+/** 按年（全部年份时）或按月（选定某一年时）的柱状图，带表格视图。 */
+function TimeChart({
+  flights,
+  stats,
+  unit,
+  year,
+}: {
+  flights: Flight[];
+  stats: NonNullable<ReturnType<typeof computeStats>>;
+  unit: DistanceUnit;
+  year: number | undefined;
+}) {
+  const [metric, setMetric] = useState<Metric>("flights");
+  const [view, setView] = useState<"chart" | "table">("chart");
+  const byMonth = year !== undefined || stats.years.length === 1;
+
+  const rows = useMemo(() => {
+    if (!byMonth) {
+      return stats.years.map((y) => ({
+        key: String(y.year),
+        label: String(y.year),
+        flights: y.flights,
+        km: y.distanceKm,
+        min: y.durationMin,
+      }));
+    }
+    const months = Array.from({ length: 12 }, (_, m) => ({
+      key: String(m + 1),
+      label: `${m + 1}月`,
+      flights: 0,
+      km: 0,
+      min: 0,
+    }));
+    for (const f of flights) {
+      const r = months[Number(f.flightDate.slice(5, 7)) - 1];
+      r.flights++;
+      r.km += f.distanceKm ?? 0;
+      r.min += f.durationMin ?? 0;
+    }
+    return months;
+  }, [byMonth, flights, stats.years]);
+
+  const toDist = (km: number) => Math.round(unit === "km" ? km : kmToMiles(km));
+  const value = (r: (typeof rows)[number]) =>
+    metric === "flights" ? r.flights : metric === "hours" ? Math.round(r.min / 60) : toDist(r.km);
+  const fmt = (v: number) =>
+    metric === "flights" ? `${v} 段` : metric === "hours" ? `${v.toLocaleString()} 小时` : `${v.toLocaleString()} ${unit}`;
+
+  const data: Column[] = rows.map((r) => ({
+    key: r.key,
+    label: r.label,
+    shortLabel: byMonth ? r.key : `’${r.key.slice(2)}`,
+    value: value(r),
+    details: [
+      ["航段", `${r.flights}`],
+      ["里程", `${toDist(r.km).toLocaleString()} ${unit}`],
+      ["时长", `${Math.round(r.min / 60)} 小时`],
+    ].filter(([k]) => !(k === "航段" && metric === "flights")) as [string, string][],
+  }));
+
   return (
-    <div className="kpi">
-      <div className="kpi-value">{value}</div>
-      <div className="kpi-label">{label}</div>
+    <section className="card wide">
+      <div className="card-head">
+        <h2 className="section-title">
+          {byMonth ? `${year ?? stats.years[0].year} 年每月` : "每年"}
+          <span className="count">{metric === "flights" ? "航段数" : metric === "hours" ? "飞行小时" : `里程（${unit}）`}</span>
+        </h2>
+        <div style={{ display: "flex", gap: 8 }}>
+          <Segmented
+            size="sm"
+            value={metric}
+            onChange={setMetric}
+            ariaLabel="指标"
+            options={[
+              { value: "flights", label: "航段" },
+              { value: "distance", label: "里程" },
+              { value: "hours", label: "时长" },
+            ]}
+          />
+          <Segmented
+            size="sm"
+            value={view}
+            onChange={setView}
+            ariaLabel="视图"
+            options={[
+              { value: "chart", label: <ChartColumn size={14} aria-label="图表" /> },
+              { value: "table", label: <Table2 size={14} aria-label="表格" /> },
+            ]}
+          />
+        </div>
+      </div>
+      {view === "chart" ? (
+        <ColumnChart data={data} format={fmt} highlightKey={data.at(-1)?.key} />
+      ) : (
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>{byMonth ? "月份" : "年份"}</th>
+              <th>航段</th>
+              <th>里程（{unit}）</th>
+              <th>小时</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.key}>
+                <td>{r.label}</td>
+                <td>{r.flights}</td>
+                <td>{toDist(r.km).toLocaleString()}</td>
+                <td>{Math.round(r.min / 60)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </section>
+  );
+}
+
+function Tile({
+  icon,
+  label,
+  value,
+  unit,
+  sub,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string | number;
+  unit?: string;
+  sub?: string;
+}) {
+  return (
+    <div className="tile">
+      <div className="tile-label">
+        {icon}
+        {label}
+      </div>
+      <div className="tile-value">
+        {typeof value === "number" ? value.toLocaleString() : value}
+        {unit && <small>{unit}</small>}
+      </div>
+      {sub && <div className="tile-sub">{sub}</div>}
     </div>
   );
 }
 
-function RankList({ title, items, label }: { title: string; items: Ranked[]; label: (key: string) => string }) {
+function RankCard({
+  title,
+  items,
+  lead,
+  leadWidth,
+  label,
+}: {
+  title: string;
+  items: Ranked[];
+  lead: (key: string) => React.ReactNode;
+  /** 前导标记列的固定宽度，保证各行名称对齐 */
+  leadWidth: number;
+  label: (key: string) => string;
+}) {
   const [expanded, setExpanded] = useState(false);
   if (items.length === 0) return null;
-  const shown = expanded ? items : items.slice(0, 8);
+  const shown = expanded ? items : items.slice(0, 6);
   const max = items[0].count;
   return (
-    <section className="card rank">
-      <h2>
-        {title} <span className="muted small">{items.length}</span>
-      </h2>
-      <ol>
-        {shown.map((r) => (
-          <li key={r.key}>
-            <span className="rank-bar" style={{ width: `${(r.count / max) * 100}%` }} />
-            <span className="rank-label">{label(r.key)}</span>
+    <section className="card">
+      <div className="card-head">
+        <h2 className="section-title">
+          {title} <span className="count">{items.length}</span>
+        </h2>
+      </div>
+      <ol className="rank-list" style={{ "--lead-w": `${leadWidth}px` } as React.CSSProperties}>
+        {shown.map((r, i) => (
+          <li key={r.key} className="rank-item">
+            <span className="rank-no">{i + 1}</span>
+            <span className="rank-lead">{lead(r.key)}</span>
+            <span className="rank-main">
+              <span className="rank-name">{label(r.key)}</span>
+              <span className="rank-track">
+                <span className="rank-fill" style={{ width: `${(r.count / max) * 100}%`, animationDelay: `${i * 40}ms` }} />
+              </span>
+            </span>
             <span className="rank-count">{r.count}</span>
           </li>
         ))}
       </ol>
-      {items.length > 8 && (
-        <button className="link" onClick={() => setExpanded(!expanded)}>
-          {expanded ? "收起" : `展开全部 ${items.length} 项`}
+      {items.length > 6 && (
+        <button className="button ghost rank-more" onClick={() => setExpanded(!expanded)}>
+          {expanded ? "收起" : `查看全部 ${items.length} 项`}
         </button>
       )}
     </section>
+  );
+}
+
+function ShareRow({ name, note, count, total }: { name: string; note?: string; count: number; total: number }) {
+  const pct = total ? Math.round((count / total) * 100) : 0;
+  return (
+    <div className="haul-row">
+      <span className="haul-name">
+        {name}
+        {note && <small>{note}</small>}
+      </span>
+      <span className="haul-val">
+        {count}
+        <small>{pct}%</small>
+      </span>
+      <span className="rank-track">
+        <span className="rank-fill" style={{ width: `${pct}%` }} />
+      </span>
+    </div>
+  );
+}
+
+/** 英雄卡片右上角的装饰航线。 */
+function HeroArc() {
+  return (
+    <svg className="hero-arc" viewBox="0 0 360 200" aria-hidden>
+      <defs>
+        <linearGradient id="hero-arc-g" x1="0" x2="1">
+          <stop offset="0" stopColor="#ffd48a" stopOpacity="0" />
+          <stop offset="0.5" stopColor="#ffd48a" stopOpacity="0.55" />
+          <stop offset="1" stopColor="#ff7a5c" stopOpacity="0.9" />
+        </linearGradient>
+      </defs>
+      <path d="M20 190 Q170 -30 340 120" fill="none" stroke="url(#hero-arc-g)" strokeWidth="1.6" />
+      <path d="M80 200 Q210 40 350 170" fill="none" stroke="url(#hero-arc-g)" strokeWidth="1" opacity="0.5" />
+      <path
+        d="M20 190 Q170 -30 340 120"
+        fill="none"
+        stroke="rgba(255,255,255,0.12)"
+        strokeWidth="1"
+        strokeDasharray="2 6"
+        transform="translate(0 14)"
+      />
+      <circle cx="340" cy="120" r="3.5" fill="#ff7a5c" />
+      <circle cx="340" cy="120" r="10" fill="#ff7a5c" opacity="0.18" />
+    </svg>
   );
 }
