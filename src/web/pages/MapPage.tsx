@@ -11,6 +11,7 @@ import { FlightTicket, ticketFromFlight } from "../ticket/FlightTicket";
 import { YearFilter } from "../ui/YearFilter";
 import { cityName, distanceParts } from "../lib/format";
 import { ErrorBox, Loading } from "../components/Status";
+import { DEMO } from "../lib/env";
 
 export function MapPage() {
   const flights = useFlights();
@@ -60,7 +61,10 @@ export function MapPage() {
 
       <div className="hud">
         <div className="hud-card glass">
-          <div className="eyebrow">{filter.year ? `${filter.year} 年飞行` : "飞行足迹"}</div>
+          <div className="eyebrow">
+            {filter.year ? `${filter.year} 年飞行` : "飞行足迹"}
+            {DEMO && <span className="demo-pill">演示数据</span>}
+          </div>
           <div className="hud-hero">
             <span className="value">{dist.value}</span>
             <span className="unit">{dist.unit}</span>

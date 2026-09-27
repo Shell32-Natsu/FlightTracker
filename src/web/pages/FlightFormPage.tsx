@@ -14,6 +14,7 @@ import { ErrorBox, Loading } from "../components/Status";
 import { RouteGlobe } from "../components/RouteGlobe";
 import { FlightTicket, type TicketData } from "../ticket/FlightTicket";
 import { Segmented } from "../ui/Segmented";
+import { ConfirmButton } from "../ui/ConfirmButton";
 import { CABINS, PURPOSES, type Flight } from "../../shared/types";
 import { flightDistanceKm, flightDurationMin } from "../../shared/derive";
 import { formatDuration } from "../../shared/time";
@@ -114,7 +115,7 @@ function FlightForm({ refData, flight }: { refData: RefData; flight?: Flight }) 
   };
 
   const remove = async () => {
-    if (!flight || !confirm(`删除 ${flight.airline}${flight.flightNumber}（${flight.flightDate}）？`)) return;
+    if (!flight) return;
     await del.mutateAsync(flight.id);
     navigate(-1);
   };
@@ -335,9 +336,9 @@ function FlightForm({ refData, flight }: { refData: RefData; flight?: Flight }) 
 
           <div className="form-actions">
             {flight && (
-              <button type="button" className="button danger" onClick={remove} disabled={busy}>
+              <ConfirmButton onConfirm={remove} disabled={busy} confirmLabel={<>再点一次删除</>}>
                 <Trash2 size={16} /> 删除
-              </button>
+              </ConfirmButton>
             )}
             <span className="spacer" />
             <button type="button" className="button ghost" onClick={() => navigate(-1)} disabled={busy}>

@@ -54,6 +54,16 @@ npm run refdata       # 重新生成参考数据（需要联网）
 npm run db:generate   # 修改 src/worker/db/schema.ts 后生成新迁移
 ```
 
+## 演示版
+
+```bash
+npm run build:demo    # 输出 dist-demo/：纯静态，无需 Worker 和 D1
+```
+
+演示版把 `/api` 换成浏览器内的模拟实现（`src/web/lib/demoApi.ts`），带 50 段虚构航班；
+资源用相对路径、路由放在内存里，可以放在任意静态托管的子路径下。改动只保存在当前页面，刷新后恢复。
+生产构建不会包含演示代码和数据。
+
 ## 部署
 
 1. 创建 D1 数据库，把返回的 `database_id` 填进 `wrangler.jsonc`：

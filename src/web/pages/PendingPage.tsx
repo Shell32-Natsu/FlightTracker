@@ -4,6 +4,7 @@ import { useConfirmFlight, useDeleteFlight, useFlights } from "../lib/api";
 import { useRefData } from "../lib/refdata";
 import { useUnit } from "../lib/useUnit";
 import { FlightTicket, ticketFromFlight } from "../ticket/FlightTicket";
+import { ConfirmButton } from "../ui/ConfirmButton";
 import { Empty, ErrorBox, Loading } from "../components/Status";
 
 export function PendingPage() {
@@ -43,15 +44,15 @@ export function PendingPage() {
                     </div>
                   )}
                   <div className="ticket-actions">
-                    <button
-                      className="button danger icon"
-                      aria-label="丢弃"
-                      title="丢弃"
+                    <ConfirmButton
+                      className="button danger icon-or-text"
+                      ariaLabel="丢弃"
                       disabled={del.isPending}
-                      onClick={() => confirm("丢弃这条航段？") && del.mutate(f.id)}
+                      onConfirm={() => del.mutate(f.id)}
+                      confirmLabel="确认丢弃"
                     >
                       <Trash2 size={17} />
-                    </button>
+                    </ConfirmButton>
                     <span className="spacer" />
                     <Link className="button" to={`/flights/${f.id}`}>
                       <Pencil size={16} /> 修改

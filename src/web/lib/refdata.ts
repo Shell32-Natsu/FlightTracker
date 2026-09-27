@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import type { Topology } from "topojson-specification";
 import type { Airline, Airport, Country } from "../../shared/types";
+import { assetUrl } from "./env";
 
 export interface RefData {
   airports: Record<string, Airport>;
@@ -10,7 +11,7 @@ export interface RefData {
 }
 
 async function load<T>(name: string): Promise<T> {
-  const res = await fetch(`/refdata/${name}.json`);
+  const res = await fetch(assetUrl(`refdata/${name}.json`));
   if (!res.ok) throw new Error(`加载参考数据 ${name} 失败`);
   return res.json();
 }

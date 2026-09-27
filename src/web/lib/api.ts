@@ -12,10 +12,15 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`/api${path}`, {
+  const req = {
     ...init,
     headers: init?.body ? { "Content-Type": "application/json", ...init.headers } : init?.headers,
-  });
+  };
+  // 条件直接写 import.meta.env，生产构建能把演示分支整个删掉
+  const res =
+    import.meta.env.MODE === "demo"
+      ? await (await import("./demoApi")).demoFetch(path, req)
+      : await fetch(`/api${path}`, req);
   if (res.status === 204) return undefined as T;
   const body = await res.json().catch(() => null);
   if (!res.ok) {

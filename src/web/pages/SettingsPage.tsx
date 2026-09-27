@@ -1,4 +1,5 @@
-import { Clapperboard, FileSpreadsheet, Image, MailPlus, Ruler, ScanSearch } from "lucide-react";
+import { Clapperboard, FileSpreadsheet, FlaskConical, Image, MailPlus, Ruler, ScanSearch } from "lucide-react";
+import { DEMO } from "../lib/env";
 import { useUnit } from "../lib/useUnit";
 import { Segmented } from "../ui/Segmented";
 import { Logo } from "../ui/Logo";
@@ -23,6 +24,15 @@ export function SettingsPage() {
       </header>
 
       <div className="settings">
+        {DEMO && (
+          <section className="card demo-note">
+            <FlaskConical size={18} />
+            <div>
+              <b>演示模式</b>
+              <p>航班是虚构的示例数据，改动只保存在当前页面，刷新后恢复初始状态。正式部署后数据存进 Cloudflare D1。</p>
+            </div>
+          </section>
+        )}
         <section className="card">
           <div className="setting-row">
             <div>

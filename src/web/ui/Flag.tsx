@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { assetUrl } from "../lib/env";
 
 /** 国家/地区旗帜（本地 SVG，Windows 上旗帜 emoji 不显示，所以不用 emoji）。 */
 export function Flag({ code, size = 20 }: { code: string; size?: number }) {
@@ -14,7 +15,7 @@ export function Flag({ code, size = 20 }: { code: string; size?: number }) {
   return (
     <img
       className="flag"
-      src={`/flags/${code}.svg`}
+      src={assetUrl(`flags/${code}.svg`)}
       alt=""
       style={style}
       loading="lazy"
