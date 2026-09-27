@@ -4,6 +4,7 @@ import { localToUtc } from "../../shared/time";
 import type { Airport, Cabin, Flight, FlightInput, Purpose } from "../../shared/types";
 import { DEFAULT_SETTINGS, SETTING_KEYS, type Settings } from "../../shared/settings";
 import { assetUrl } from "./env";
+import { dedupeKey, flightsToCsv } from "../../shared/flightCsv";
 import { DEMO_FLIGHTS, DEMO_PENDING } from "./demoData";
 
 /**
@@ -141,6 +142,30 @@ export async function demoFetch(path: string, init: RequestInit): Promise<Respon
       settings = { ...settings, ...patch };
     }
     return json(settings);
+  }
+  if (parts[0] === "import" && method === "POST" && init.body) {
+    const items = (JSON.parse(String(init.body)) as { flights: FlightInput[] }).flights;
+    const existing = new Set(flights.map(dedupeKey));
+    const invalid: { index: number; message: string }[] = [];
+    let inserted = 0;
+    items.forEach((item, index) => {
+      const input = { ...item, source: "csv" as const };
+      const err = validate(input);
+      if (err && !err.startsWith("已存在")) return invalid.push({ index, message: err });
+      if (existing.has(dedupeKey(input))) return;
+      flights.push(makeFlight(input));
+      existing.add(dedupeKey(input));
+      inserted++;
+    });
+    return json({ inserted, duplicates: items.length - invalid.length - inserted, invalid });
+  }
+  if (parts[0] === "export" && parts[1] === "csv") {
+    return new Response(flightsToCsv(flights.filter((f) => f.status === "confirmed"), airports!), {
+      headers: {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": `attachment; filename="flighttracker-demo.csv"`,
+      },
+    });
   }
   if (parts[0] !== "flights") return json({ error: "Not found" }, 404);
 

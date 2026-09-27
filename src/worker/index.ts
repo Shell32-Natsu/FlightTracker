@@ -2,13 +2,15 @@ import { Hono } from "hono";
 import { accessAuth } from "./auth";
 import { flightRoutes } from "./routes/flights";
 import { settingsRoutes } from "./routes/settings";
+import { importExportRoutes } from "./routes/importExport";
 import type { AppEnv } from "./env";
 
 const api = new Hono<AppEnv>()
   .use("*", accessAuth)
   .get("/me", (c) => c.json({ email: c.get("userEmail") }))
   .route("/flights", flightRoutes)
-  .route("/settings", settingsRoutes);
+  .route("/settings", settingsRoutes)
+  .route("/", importExportRoutes);
 
 const app = new Hono<AppEnv>()
   .route("/api", api)

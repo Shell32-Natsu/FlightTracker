@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Check,
   Clapperboard,
+  Download,
+  Upload,
   FileSpreadsheet,
   FlaskConical,
   Image,
@@ -11,7 +13,8 @@ import {
   ScanSearch,
 } from "lucide-react";
 import { DEMO } from "../lib/env";
-import { useFlights, useSettings, useUpdateSettings } from "../lib/api";
+import { downloadExportCsv, useFlights, useSettings, useUpdateSettings } from "../lib/api";
+import { Link } from "react-router-dom";
 import { useRefData, useWorldTopo, type RefData } from "../lib/refdata";
 import { computeStats, mostVisitedAirport } from "../../shared/stats";
 import { RouteGlobe } from "../components/RouteGlobe";
@@ -21,7 +24,6 @@ import { Logo } from "../ui/Logo";
 
 const ROADMAP = [
   { icon: ScanSearch, title: "航班号自动补全", desc: "输入航班号和日期，自动带出时间、机型和机尾号", tag: "M3" },
-  { icon: FileSpreadsheet, title: "CSV 导入导出", desc: "批量导入历史航班，随时导出备份", tag: "M3" },
   { icon: MailPlus, title: "邮件转发导入", desc: "把确认邮件转发到专用地址，自动识别航段", tag: "M4" },
   { icon: Image, title: "海报与卡片导出", desc: "年度海报、单次航班卡片、手机壁纸", tag: "M5" },
   { icon: Clapperboard, title: "航线动画", desc: "飞机沿航线飞行的短视频，导出 MP4", tag: "M6" },
@@ -69,6 +71,8 @@ export function SettingsPage() {
         </section>
 
         <HomeAirportSetting />
+
+        <ImportExportCard />
 
         <section className="card">
           <div className="card-head">
@@ -253,6 +257,46 @@ function HomeAirportSetting() {
           </div>
         </div>
       </div>
+    </section>
+  );
+}
+
+function ImportExportCard() {
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  return (
+    <section className="card">
+      <div className="setting-row">
+        <div>
+          <h2 className="section-title">
+            <FileSpreadsheet size={18} className="faint" /> 导入与导出
+          </h2>
+          <p>从 Flighty 或之前导出的 CSV 批量导入；导出全部航班作为备份（时间为机场当地时间）</p>
+        </div>
+      </div>
+      <div className="io-actions" style={{ marginTop: 16 }}>
+        <Link to="/import" className="button primary">
+          <Upload size={16} /> 导入 CSV
+        </Link>
+        <button
+          className="button"
+          disabled={busy}
+          onClick={async () => {
+            setError(null);
+            setBusy(true);
+            try {
+              await downloadExportCsv();
+            } catch (err) {
+              setError(err instanceof Error ? err.message : String(err));
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          <Download size={16} /> {busy ? "导出中…" : "导出 CSV"}
+        </button>
+      </div>
+      {error && <div className="error-box">{error}</div>}
     </section>
   );
 }

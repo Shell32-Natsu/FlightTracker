@@ -1,6 +1,6 @@
 import { useDeferredValue, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronRight, Inbox, Plus, Search } from "lucide-react";
+import { ChevronRight, Inbox, Plus, Search, Upload } from "lucide-react";
 import { useFlights } from "../lib/api";
 import { useRefData, type RefData } from "../lib/refdata";
 import { useUnit } from "../lib/useUnit";
@@ -72,7 +72,8 @@ export function FlightsPage() {
           <p className="page-sub">
             {total ? (
               <>
-                {total} 段航班{years[0] !== years[1] ? ` · ${years[0]} – ${years[1]}` : ` · ${years[0]}`}
+                {total} 段航班
+                {years[0] !== years[1] ? ` · ${years[0]} – ${years[1]}` : ` · ${years[0]}`}
               </>
             ) : (
               "你的每一段飞行都会记录在这里"
@@ -80,16 +81,21 @@ export function FlightsPage() {
           </p>
         </div>
         {total > 0 && (
-          <label className="search">
-            <Search size={18} />
-            <input
-              className="input"
-              type="search"
-              placeholder="搜索航班号、城市、机场、机型…"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-            />
-          </label>
+          <div className="flights-tools">
+            <label className="search">
+              <Search size={18} />
+              <input
+                className="input"
+                type="search"
+                placeholder="搜索航班号、城市、机场、机型…"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+              />
+            </label>
+            <Link to="/import" className="button icon" aria-label="导入 CSV" title="导入 CSV">
+              <Upload size={18} />
+            </Link>
+          </div>
         )}
       </header>
 
@@ -110,12 +116,17 @@ export function FlightsPage() {
         <Empty
           title="还没有航班记录"
           action={
-            <Link to="/add" className="button primary">
-              <Plus size={18} /> 添加第一段航班
-            </Link>
+            <div className="io-actions">
+              <Link to="/add" className="button primary">
+                <Plus size={18} /> 添加第一段航班
+              </Link>
+              <Link to="/import" className="button">
+                <Upload size={16} /> 从 CSV 导入
+              </Link>
+            </div>
           }
         >
-          填上航班号和日期，航线就会出现在地图上。
+          填上航班号和日期，航线就会出现在地图上；也可以从 Flighty 导出的 CSV 一次导入。
         </Empty>
       ) : shownCount === 0 ? (
         <Empty title="没有匹配的航班">换个关键词试试，比如城市名、航班号或机型代码。</Empty>

@@ -1170,6 +1170,22 @@ input[type="time"]::-webkit-calendar-picker-indicator {
    航班列表
    ========================================================================== */
 
+.flights-tools {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+  justify-content: flex-end;
+  min-width: 220px;
+  max-width: 470px;
+}
+
+.flights-tools .button.icon {
+  height: 44px;
+  width: 44px;
+  border-radius: 14px;
+  flex-shrink: 0;
+}
+
 .search {
   position: relative;
   flex: 1;
@@ -2793,4 +2809,301 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   background: var(--gold-wash);
   color: var(--gold);
   border-color: rgba(255, 184, 77, 0.25);
+}
+
+/* ==========================================================================
+   导入
+   ========================================================================== */
+
+.dropzone {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 44px 20px;
+  border-radius: var(--radius-l);
+  border: 1.5px dashed var(--line-3);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-2);
+  text-align: center;
+  cursor: pointer;
+  transition:
+    border-color 0.2s,
+    background 0.2s;
+}
+
+.dropzone:hover,
+.dropzone.over {
+  border-color: rgba(255, 184, 77, 0.6);
+  background: var(--gold-wash);
+}
+
+.dropzone svg {
+  color: var(--gold);
+}
+
+.dropzone input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.dropzone span {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dropzone b {
+  color: var(--text-1);
+  font-weight: 650;
+}
+
+.dropzone small {
+  font-size: 0.8rem;
+  color: var(--text-3);
+}
+
+.dropzone.compact {
+  flex-direction: row;
+  justify-content: flex-start;
+  padding: 14px 18px;
+  text-align: left;
+}
+
+.import-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 20px 0 12px;
+}
+
+.import-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--surface-2), var(--surface-1));
+  overflow: hidden;
+}
+
+.import-row {
+  display: grid;
+  grid-template-columns: 96px minmax(110px, 0.8fr) minmax(110px, 0.8fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 11px 16px;
+  font-size: 0.88rem;
+  font-feature-settings: "tnum";
+}
+
+.import-row + .import-row {
+  border-top: 1px solid var(--line);
+}
+
+.import-row.duplicate,
+.import-row.skipped {
+  color: var(--text-3);
+}
+
+.ir-date {
+  color: var(--text-2);
+}
+
+.ir-code-m {
+  display: none;
+}
+
+.ir-meta {
+  color: var(--text-3);
+  font-size: 0.82rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ir-flight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ir-route {
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.ir-status {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.ir-note {
+  grid-column: 2 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 0.78rem;
+  color: var(--text-3);
+}
+
+.import-row.error .ir-note {
+  color: #ffb3b3;
+}
+
+.ir-warn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--gold);
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 11px;
+  font-size: 0.72rem;
+  font-weight: 650;
+  white-space: nowrap;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-2);
+}
+
+.pill.new {
+  background: rgba(61, 220, 151, 0.14);
+  color: var(--good);
+}
+
+.pill.error {
+  background: var(--danger-wash);
+  color: var(--danger);
+}
+
+.pill.future {
+  background: rgba(120, 170, 255, 0.14);
+  color: #9cc0ff;
+}
+
+.import-footer {
+  position: sticky;
+  bottom: calc(var(--dock-h) + var(--dock-gap) * 2 + env(safe-area-inset-bottom));
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--glass-strong);
+  border: 1px solid var(--line-2);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+@media (min-width: 900px) {
+  .import-footer {
+    bottom: 16px;
+  }
+}
+
+.import-footer .spacer {
+  flex: 1;
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88rem;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.check input {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--gold);
+}
+
+.import-result {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.import-result > svg {
+  color: var(--good);
+  flex-shrink: 0;
+}
+
+.import-result h2 {
+  font-size: 1.2rem;
+}
+
+.import-invalid {
+  margin: 0 0 12px;
+  padding-left: 18px;
+  color: #ffb3b3;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 560px) {
+  .import-footer .check {
+    flex-basis: 100%;
+  }
+
+  .import-footer .spacer {
+    display: none;
+  }
+
+  .import-footer .button.primary {
+    flex: 1;
+  }
+
+  .import-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .ir-date {
+    grid-column: 1;
+    font-size: 0.78rem;
+  }
+
+  .ir-status {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+
+  .ir-route {
+    grid-column: 1;
+  }
+
+  .ir-flight,
+  .ir-meta {
+    display: none;
+  }
+
+  .ir-code-m {
+    display: inline;
+  }
+
+  .ir-note {
+    grid-column: 1 / -1;
+  }
+}
+
+.io-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }

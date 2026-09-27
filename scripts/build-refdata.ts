@@ -12,6 +12,7 @@ import { mkdir, writeFile, copyFile, access } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
 import tzlookup from "@photostructure/tz-lookup";
+import { parseCsv } from "../src/shared/csv";
 
 const require = createRequire(import.meta.url);
 const ROOT = path.resolve(import.meta.dirname, "..");
@@ -29,7 +30,11 @@ const SOURCES = {
 
 /** OpenFlights 的航司表停更多年，新航司在这里手动补。 */
 const EXTRA_AIRLINES: Record<string, { name: string; icao?: string; country?: string }> = {
-  // "XX": { name: "Example Air", icao: "XXX", country: "US" },
+  ZG: { name: "ZIPAIR Tokyo", icao: "TZP", country: "Japan" },
+  FJ: { name: "Fiji Airways", icao: "FJI", country: "Fiji" },
+  // 已停运、ICAO 代码被现役航司沿用的：去掉 ICAO，免得 ICAO→IATA 反查撞车（SWR→LX、TGW→TR）
+  SR: { name: "Swissair", country: "Switzerland" },
+  TT: { name: "Tiger Airways Australia", country: "Australia" },
 };
 
 /** planes.dat 缺的或名称需要修正的机型。 */
@@ -60,40 +65,6 @@ async function fetchText(url: string): Promise<string> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
   return res.text();
-}
-
-/** 最小 CSV 解析，支持引号、转义引号、引号内换行。 */
-export function parseCsv(text: string): string[][] {
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let field = "";
-  let inQuotes = false;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (inQuotes) {
-      if (c === '"') {
-        if (text[i + 1] === '"') {
-          field += '"';
-          i++;
-        } else inQuotes = false;
-      } else field += c;
-    } else if (c === '"') inQuotes = true;
-    else if (c === ",") {
-      row.push(field);
-      field = "";
-    } else if (c === "\n" || c === "\r") {
-      if (c === "\r" && text[i + 1] === "\n") i++;
-      row.push(field);
-      rows.push(row);
-      row = [];
-      field = "";
-    } else field += c;
-  }
-  if (field !== "" || row.length) {
-    row.push(field);
-    rows.push(row);
-  }
-  return rows.filter((r) => r.length > 1 || r[0] !== "");
 }
 
 function toObjects(rows: string[][]): Record<string, string>[] {

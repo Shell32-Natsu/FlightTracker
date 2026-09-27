@@ -12,16 +12,20 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+/** 发请求：正式版走 /api，演示版走浏览器内的模拟实现。 */
+async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
   const req = {
     ...init,
     headers: init?.body ? { "Content-Type": "application/json", ...init.headers } : init?.headers,
   };
   // 条件直接写 import.meta.env，生产构建能把演示分支整个删掉
-  const res =
-    import.meta.env.MODE === "demo"
-      ? await (await import("./demoApi")).demoFetch(path, req)
-      : await fetch(`/api${path}`, req);
+  return import.meta.env.MODE === "demo"
+    ? (await import("./demoApi")).demoFetch(path, req)
+    : fetch(`/api${path}`, req);
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await apiFetch(path, init);
   if (res.status === 204) return undefined as T;
   const body = await res.json().catch(() => null);
   if (!res.ok) {
@@ -105,4 +109,34 @@ export function useUpdateSettings() {
     onError: (_err, _patch, ctx) => qc.setQueryData(settingsKey, ctx?.prev),
     onSuccess: (saved) => qc.setQueryData(settingsKey, saved),
   });
+}
+
+export interface ImportResult {
+  inserted: number;
+  duplicates: number;
+  invalid: { index: number; message: string }[];
+}
+
+/** 批量导入（CSV 已在浏览器里解析好）。 */
+export function useImportFlights() {
+  const invalidate = useInvalidateFlights();
+  return useMutation({
+    mutationFn: (flights: FlightInput[]) =>
+      request<ImportResult>("/import", { method: "POST", body: JSON.stringify({ flights }) }),
+    onSuccess: invalidate,
+  });
+}
+
+/** 下载全部已确认航班的 CSV。 */
+export async function downloadExportCsv(): Promise<void> {
+  const res = await apiFetch("/export/csv");
+  if (!res.ok) throw new ApiError(`导出失败（${res.status}）`, res.status);
+  const blob = await res.blob();
+  const name = /filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") ?? "")?.[1] ?? "flights.csv";
+  const url = URL.createObjectURL(blob);
+  const a = Object.assign(document.createElement("a"), { href: url, download: name });
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

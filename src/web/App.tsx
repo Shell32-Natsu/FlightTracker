@@ -5,6 +5,7 @@ import { FlightsPage } from "./pages/FlightsPage";
 import { AddFlightPage, EditFlightPage } from "./pages/FlightFormPage";
 import { PendingPage } from "./pages/PendingPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { ImportPage } from "./pages/ImportPage";
 import { useFlights } from "./lib/api";
 import { Loading } from "./components/Status";
 import { Logo } from "./ui/Logo";
@@ -49,6 +50,7 @@ export function App() {
             <Route path="/pending" element={<PendingPage />} />
             <Route path="/stats" element={<StatsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/import" element={<ImportPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>

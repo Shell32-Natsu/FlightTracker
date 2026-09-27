@@ -68,7 +68,7 @@ export const flightInputSchema = z
 type FlightValues = z.infer<typeof flightInputSchema>;
 
 /** 写入前在服务端算好距离和时长。 */
-function withDerived(v: FlightValues) {
+export function withDerived(v: FlightValues) {
   return {
     ...v,
     distanceKm: flightDistanceKm(findAirport(v.depAirport), findAirport(v.arrAirport)),
