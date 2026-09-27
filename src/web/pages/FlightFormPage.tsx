@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeftRight, Trash2 } from "lucide-react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { ArrowLeftRight, ChevronLeft, Trash2 } from "lucide-react";
 import { useCreateFlight, useDeleteFlight, useFlights, useUpdateFlight } from "../lib/api";
 import { useRefData, useWorldTopo, type RefData } from "../lib/refdata";
 import {
@@ -45,6 +45,10 @@ export function EditFlightPage() {
 
 function FlightForm({ refData, flight }: { refData: RefData; flight?: Flight }) {
   const navigate = useNavigate();
+  const location = useLocation();
+  // 从应用内进来就回到上一页；直接打开链接进来（没有上一页）就回航班列表
+  const back = () =>
+    location.key !== "default" ? navigate(-1) : navigate(flight?.status === "pending" ? "/pending" : "/flights");
   const create = useCreateFlight();
   const update = useUpdateFlight();
   const del = useDeleteFlight();
@@ -117,13 +121,16 @@ function FlightForm({ refData, flight }: { refData: RefData; flight?: Flight }) 
   const remove = async () => {
     if (!flight) return;
     await del.mutateAsync(flight.id);
-    navigate(-1);
+    back();
   };
 
   const swap = () => setForm((f) => ({ ...f, depAirport: f.arrAirport, arrAirport: f.depAirport }));
 
   return (
     <form className="page" onSubmit={submit}>
+      <button type="button" className="back-link" onClick={back}>
+        <ChevronLeft size={18} /> {flight?.status === "pending" ? "待确认" : "航班"}
+      </button>
       <header className="page-head">
         <div>
           <h1 className="page-title">{flight ? "编辑航班" : "添加航班"}</h1>
@@ -341,7 +348,7 @@ function FlightForm({ refData, flight }: { refData: RefData; flight?: Flight }) 
               </ConfirmButton>
             )}
             <span className="spacer" />
-            <button type="button" className="button ghost" onClick={() => navigate(-1)} disabled={busy}>
+            <button type="button" className="button ghost" onClick={back} disabled={busy}>
               取消
             </button>
             <button type="submit" className="button primary" disabled={busy}>

@@ -352,6 +352,26 @@ h3 {
   }
 }
 
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 36px;
+  margin: -6px 0 10px -8px;
+  padding: 0 10px 0 4px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--gold);
+  font-size: 0.95rem;
+  font-weight: 550;
+  cursor: pointer;
+}
+
+.back-link:hover {
+  background: var(--gold-wash);
+}
+
 .page-head {
   display: flex;
   align-items: flex-end;
