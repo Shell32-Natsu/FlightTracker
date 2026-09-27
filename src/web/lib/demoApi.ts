@@ -2,6 +2,7 @@ import { flightDistanceKm, flightDurationMin } from "../../shared/derive";
 import { greatCircleKm } from "../../shared/geo";
 import { localToUtc } from "../../shared/time";
 import type { Airport, Cabin, Flight, FlightInput, Purpose } from "../../shared/types";
+import { DEFAULT_SETTINGS, SETTING_KEYS, type Settings } from "../../shared/settings";
 import { assetUrl } from "./env";
 import { DEMO_FLIGHTS, DEMO_PENDING } from "./demoData";
 
@@ -12,6 +13,7 @@ import { DEMO_FLIGHTS, DEMO_PENDING } from "./demoData";
 
 let airports: Record<string, Airport> | null = null;
 let store: Flight[] | null = null;
+let settings: Settings = { ...DEFAULT_SETTINGS };
 
 const iso = (ms: number) => new Date(ms).toISOString().replace(/\.\d{3}Z$/, "Z");
 
@@ -125,6 +127,21 @@ export async function demoFetch(path: string, init: RequestInit): Promise<Respon
   const url = new URL(path, "http://demo");
   const parts = url.pathname.split("/").filter(Boolean); // ["flights", id?, "confirm"?]
   const body = init.body ? (JSON.parse(String(init.body)) as FlightInput) : null;
+
+  if (parts[0] === "settings") {
+    if (method === "PUT" && init.body) {
+      const patch = JSON.parse(String(init.body)) as Partial<Settings>;
+      if (Object.keys(patch).some((k) => !(SETTING_KEYS as string[]).includes(k))) {
+        return json({ error: "未知的设置项" }, 400);
+      }
+      if (patch.homeAirport) {
+        patch.homeAirport = patch.homeAirport.toUpperCase();
+        if (!airports![patch.homeAirport]) return json({ error: "机场表里没有这个三字码" }, 400);
+      }
+      settings = { ...settings, ...patch };
+    }
+    return json(settings);
+  }
   if (parts[0] !== "flights") return json({ error: "Not found" }, 404);
 
   if (parts.length === 1 && method === "GET") {

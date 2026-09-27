@@ -68,3 +68,10 @@ export const lookupCache = sqliteTable("lookup_cache", {
   responseJson: text("response_json").notNull(),
   fetchedAt: text("fetched_at").notNull(),
 });
+
+/** 用户设置：每项一行，value 为 JSON（单用户应用，不需要用户列）。 */
+export const settings = sqliteTable("settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});

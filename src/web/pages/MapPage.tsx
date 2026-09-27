@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import { Globe, LocateFixed, Map as MapIcon, Minus, Plus, X } from "lucide-react";
-import { useFlights } from "../lib/api";
+import { useFlights, useSettings } from "../lib/api";
 import { useRefData, useWorldTopo } from "../lib/refdata";
 import { useFilter } from "../lib/useFilter";
 import { useUnit } from "../lib/useUnit";
@@ -17,6 +17,8 @@ export function MapPage() {
   const flights = useFlights();
   const ref = useRefData();
   const world = useWorldTopo();
+  // 设置决定起始视角，先等它加载完（失败时用自动选择）
+  const settings = useSettings();
   const [filter, setFilter] = useFilter();
   const [unit] = useUnit();
   const [selected, setSelected] = useState<string | null>(null);
@@ -39,7 +41,7 @@ export function MapPage() {
 
   if (flights.error) return <ErrorBox error={flights.error} />;
   if (ref.error) return <ErrorBox error={ref.error} />;
-  if (!ref.data || flights.isPending) return <Loading label="正在准备地图" />;
+  if (!ref.data || flights.isPending || settings.isPending) return <Loading label="正在准备地图" />;
 
   const dist = distanceParts(stats?.distanceKm ?? 0, unit);
   const hovered = hover ? byRoute.get(hover.key) : undefined;
@@ -54,6 +56,7 @@ export function MapPage() {
         refData={ref.data}
         world={world.data}
         projection={projection}
+        homeAirport={settings.data?.homeAirport ?? null}
         selectedRoute={selected}
         onSelectRoute={setSelected}
         onHoverRoute={setHover}

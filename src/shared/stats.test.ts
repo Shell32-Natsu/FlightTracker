@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { computeStats, filterFlights, haulBreakdown, haulOf, monthMatrix, routeKey } from "./stats";
+import {
+  computeStats,
+  filterFlights,
+  haulBreakdown,
+  haulOf,
+  monthMatrix,
+  mostVisitedAirport,
+  resolveHomeAirport,
+  routeKey,
+} from "./stats";
 import type { Airport, Flight } from "./types";
 
 const ap = (country: string): Airport => ({ name: "", country, lat: 0, lon: 0, tz: "UTC" });
@@ -118,5 +127,25 @@ describe("haul", () => {
     expect(h.short.count).toBe(2);
     expect(h.medium.count).toBe(1);
     expect(h.long).toEqual({ count: 1, distanceKm: 8200 });
+  });
+});
+
+describe("大本营", () => {
+  it("取起降次数最多的机场", () => {
+    // PVG 出现 3 次，PEK 2 次
+    expect(mostVisitedAirport(data)).toBe("PVG");
+  });
+  it("次数相同时按字母序，和机场排行第一名一致", () => {
+    const tie = [flight({ depAirport: "SFO", arrAirport: "NRT" })];
+    expect(mostVisitedAirport(tie)).toBe("NRT");
+    expect(computeStats(tie, airports).airports[0].key).toBe("NRT");
+  });
+  it("没有航班时为 null", () => {
+    expect(mostVisitedAirport([])).toBeNull();
+  });
+  it("指定的机场优先，但必须在机场表里", () => {
+    expect(resolveHomeAirport(data, "SFO", airports)).toBe("SFO");
+    expect(resolveHomeAirport(data, "ZZZ", airports)).toBe("PVG");
+    expect(resolveHomeAirport(data, null, airports)).toBe("PVG");
   });
 });

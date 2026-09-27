@@ -2582,6 +2582,103 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   font-size: 0.85rem;
 }
 
+.home-setting {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+
+@media (min-width: 640px) {
+  .home-setting {
+    grid-template-columns: 240px minmax(0, 1fr);
+    align-items: center;
+  }
+}
+
+.home-globe {
+  border-radius: var(--radius);
+  background: radial-gradient(circle at 50% 50%, #0d1830, #05080f 75%);
+  border: 1px solid var(--line);
+  overflow: hidden;
+  max-width: 100%;
+}
+
+.home-globe svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.home-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.home-current {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.home-current span:last-child {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.home-current b {
+  font-weight: 650;
+}
+
+.home-current small {
+  color: var(--text-3);
+  font-size: 0.82rem;
+}
+
+.iata-chip.lg {
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 12px;
+  font-size: 1.05rem;
+  background: var(--gold);
+  color: var(--gold-ink);
+}
+
+.home-picks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.home-pick-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.small-note {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.save-status {
+  min-height: 1.2em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--text-3);
+}
+
+.save-status .bad {
+  color: var(--danger);
+}
+
 .roadmap {
   list-style: none;
   margin: 0;

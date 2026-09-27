@@ -164,3 +164,31 @@ export function haulBreakdown(flights: Flight[]): Record<Haul, { count: number; 
   }
   return out;
 }
+
+/**
+ * 起降次数最多的机场（出发、到达各算一次）。
+ * 次数相同时取三字码字母序靠前的，和统计页机场排行的第一名一致。
+ */
+export function mostVisitedAirport(flights: Pick<Flight, "depAirport" | "arrAirport">[]): string | null {
+  const count = new Map<string, number>();
+  for (const f of flights) {
+    count.set(f.depAirport, (count.get(f.depAirport) ?? 0) + 1);
+    count.set(f.arrAirport, (count.get(f.arrAirport) ?? 0) + 1);
+  }
+  let best: string | null = null;
+  for (const [code, n] of count) {
+    const b = best === null ? -1 : count.get(best)!;
+    if (n > b || (n === b && code < best!)) best = code;
+  }
+  return best;
+}
+
+/** 地图的“大本营”：设置里指定了且机场表里有就用指定的，否则自动选。 */
+export function resolveHomeAirport(
+  flights: Pick<Flight, "depAirport" | "arrAirport">[],
+  override: string | null | undefined,
+  knownAirports: Record<string, unknown>,
+): string | null {
+  if (override && knownAirports[override]) return override;
+  return mostVisitedAirport(flights);
+}

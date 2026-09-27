@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Flight, FlightInput, FlightStatus } from "../../shared/types";
+import { DEFAULT_SETTINGS, type Settings } from "../../shared/settings";
 
 export class ApiError extends Error {
   constructor(
@@ -75,5 +76,33 @@ export function useConfirmFlight() {
   return useMutation({
     mutationFn: (id: string) => request<Flight>(`/flights/${id}/confirm`, { method: "POST" }),
     onSuccess: invalidate,
+  });
+}
+
+const settingsKey = ["settings"] as const;
+
+/** 用户设置（存在服务端 D1）。加载失败时调用方用默认值兜底。 */
+export function useSettings() {
+  return useQuery({
+    queryKey: settingsKey,
+    queryFn: () => request<Settings>("/settings"),
+    staleTime: Infinity,
+  });
+}
+
+/** 部分更新设置；先乐观更新界面，失败时回滚。 */
+export function useUpdateSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (patch: Partial<Settings>) =>
+      request<Settings>("/settings", { method: "PUT", body: JSON.stringify(patch) }),
+    onMutate: async (patch) => {
+      await qc.cancelQueries({ queryKey: settingsKey });
+      const prev = qc.getQueryData<Settings>(settingsKey);
+      qc.setQueryData<Settings>(settingsKey, { ...DEFAULT_SETTINGS, ...prev, ...patch });
+      return { prev };
+    },
+    onError: (_err, _patch, ctx) => qc.setQueryData(settingsKey, ctx?.prev),
+    onSuccess: (saved) => qc.setQueryData(settingsKey, saved),
   });
 }

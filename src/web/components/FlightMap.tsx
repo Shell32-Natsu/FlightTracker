@@ -12,7 +12,7 @@ import { feature } from "topojson-client";
 import type { GeometryCollection, Topology } from "topojson-specification";
 import type { Feature, FeatureCollection, LineString, MultiLineString, Point } from "geojson";
 import type { Flight } from "../../shared/types";
-import { routeKey } from "../../shared/stats";
+import { resolveHomeAirport, routeKey } from "../../shared/stats";
 import { maplibregl } from "../lib/maplibre";
 import type { RefData } from "../lib/refdata";
 import { joinAntimeridian, unwrapGeometry } from "../lib/antimeridian";
@@ -36,6 +36,8 @@ interface Props {
   refData: RefData;
   world: Topology | undefined;
   projection: MapProjection;
+  /** 设置里指定的“大本营”机场；null 时按起降次数自动选择 */
+  homeAirport: string | null;
   selectedRoute: string | null;
   onSelectRoute: (key: string | null) => void;
   onHoverRoute: (hover: RouteHover | null) => void;
@@ -86,7 +88,7 @@ function graticule(): FeatureCollection<LineString> {
 
 /** 交互航线地图：3D 地球 + 发光渐变航线 + 机场光点，不依赖外部瓦片。 */
 export const FlightMap = forwardRef<FlightMapHandle, Props>(function FlightMap(
-  { flights, refData, world, projection, selectedRoute, onSelectRoute, onHoverRoute },
+  { flights, refData, world, projection, homeAirport, selectedRoute, onSelectRoute, onHoverRoute },
   handle,
 ) {
   const container = useRef<HTMLDivElement>(null);
@@ -95,7 +97,7 @@ export const FlightMap = forwardRef<FlightMapHandle, Props>(function FlightMap(
   const callbacks = useRef({ onSelectRoute, onHoverRoute });
   callbacks.current = { onSelectRoute, onHoverRoute };
 
-  const layers = useMemo(() => buildLayers(flights, refData), [flights, refData]);
+  const layers = useMemo(() => buildLayers(flights, refData, homeAirport), [flights, refData, homeAirport]);
   const homeRef = useRef(layers.home);
   homeRef.current = layers.home;
 
@@ -112,7 +114,7 @@ export const FlightMap = forwardRef<FlightMapHandle, Props>(function FlightMap(
     };
   }, [world, layers.visitedNumeric]);
 
-  /** 以最常去的机场为中心；地球直径约占视口短边的 80%（手机上占满宽度）。 */
+  /** 以“大本营”（设置里指定的，或起降最多的）为中心；地球直径约占视口短边的 80%（手机上占满宽度）。 */
   const initialView = () => {
     const w = container.current?.clientWidth ?? 1000;
     const h = container.current?.clientHeight ?? 800;
@@ -390,7 +392,7 @@ export const FlightMap = forwardRef<FlightMapHandle, Props>(function FlightMap(
   return <div ref={container} className="flight-map" />;
 });
 
-function buildLayers(flights: Flight[], refData: RefData) {
+function buildLayers(flights: Flight[], refData: RefData, homeOverride: string | null) {
   const routeCount = new Map<string, { a: string; b: string; count: number }>();
   const airportCount = new Map<string, number>();
   const visitedNumeric = new Set<string>();
@@ -421,9 +423,10 @@ function buildLayers(flights: Flight[], refData: RefData) {
   // 常飞航线画在上层
   routes.features.sort((x, y) => x.properties!.count - y.properties!.count);
 
-  let homeCode: string | null = null;
-  for (const [code, n] of airportCount) if (!homeCode || n > airportCount.get(homeCode)!) homeCode = code;
+  const homeCode = resolveHomeAirport(flights, homeOverride, refData.airports);
   const home = homeCode ? refData.airports[homeCode] : undefined;
+  // 指定的大本营可能还没飞过，也要画出来
+  if (homeCode && home && !airportCount.has(homeCode)) airportCount.set(homeCode, 0);
 
   const airports: FeatureCollection<Point> = {
     type: "FeatureCollection",
