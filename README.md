@@ -56,7 +56,7 @@ npm run db:generate   # 修改 src/worker/db/schema.ts 后生成新迁移
 
 ## 演示版
 
-在线演示：<https://shell32-natsu.github.io/FlightTracker/>（推送到 `main` 后由 `.github/workflows/pages.yml` 自动发布）
+在线演示：<https://blog.xiadong.info/FlightTracker/>（推送到 `main` 后由 `.github/workflows/pages.yml` 自动发布）
 
 ```bash
 npm run dev:demo      # 本地预览演示版，不需要 Worker 和 D1
