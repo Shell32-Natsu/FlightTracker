@@ -1,6 +1,11 @@
 /* ==========================================================================
    航迹 · 设计系统
    深色“夜航”主题：深海军蓝底、琥珀色航线、玻璃质感浮层。
+
+   玻璃的用法（兼顾性能）：
+   - 页面底下是一层固定的柔光背景（body::before，只绘制一次，滚动不重绘）
+   - 卡片是“伪玻璃”：半透明渐变 + 顶部高光，透出柔光底色，不用 backdrop-filter
+   - 真正的背景模糊只给少数浮在内容上的元素：底部 Dock、地图 HUD、提示框、吸顶标题、导入操作栏
    ========================================================================== */
 
 :root {
@@ -11,8 +16,18 @@
   --surface-1: #0b111d;
   --surface-2: #101828;
   --surface-3: #172135;
-  --glass: rgba(11, 17, 29, 0.72);
-  --glass-strong: rgba(11, 17, 29, 0.88);
+  --glass: rgba(12, 18, 32, 0.58);
+  --glass-strong: rgba(10, 15, 27, 0.8);
+  --glass-blur: blur(20px) saturate(170%);
+  /* 玻璃顶边的高光 + 细微内发光 */
+  --glass-edge: inset 0 1px 0 rgba(255, 255, 255, 0.08), inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+  /* 伪玻璃卡片 */
+  --card-bg: linear-gradient(180deg, rgba(22, 32, 52, 0.62), rgba(12, 18, 31, 0.5));
+  /* 页面柔光底：body::before 和票根缺口共用，保证对齐 */
+  --ambient:
+    radial-gradient(70vmax 46vmax at 6% -10%, rgba(88, 120, 255, 0.17), transparent 70%),
+    radial-gradient(56vmax 40vmax at 104% 2%, rgba(255, 184, 77, 0.1), transparent 70%),
+    radial-gradient(64vmax 46vmax at 72% 112%, rgba(64, 170, 220, 0.08), transparent 70%), var(--bg);
   --line: rgba(255, 255, 255, 0.07);
   --line-2: rgba(255, 255, 255, 0.12);
   --line-3: rgba(255, 255, 255, 0.2);
@@ -69,17 +84,25 @@
 html,
 body {
   margin: 0;
-  background: var(--bg);
   color: var(--text-1);
+}
+
+html {
+  background: var(--bg);
 }
 
 body {
   min-height: 100dvh;
-  background:
-    radial-gradient(1100px 520px at 12% -8%, rgba(88, 120, 255, 0.09), transparent 70%),
-    radial-gradient(900px 480px at 100% -4%, rgba(255, 184, 77, 0.06), transparent 70%),
-    var(--bg);
-  background-attachment: fixed;
+}
+
+/* 固定的柔光层：独立合成层，滚动时不重绘（替代 background-attachment: fixed） */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--ambient);
 }
 
 a {
@@ -153,11 +176,11 @@ h3 {
   align-items: center;
   padding: 0 6px;
   border-radius: 24px;
-  background: var(--glass);
+  background: linear-gradient(180deg, rgba(24, 34, 56, 0.62), rgba(10, 15, 27, 0.62));
   border: 1px solid var(--line-2);
-  box-shadow: var(--shadow-l);
-  backdrop-filter: blur(22px) saturate(160%);
-  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  box-shadow: var(--glass-edge), var(--shadow-l);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
 }
 
 .dock-link {
@@ -237,14 +260,16 @@ h3 {
     align-items: center;
     gap: 14px;
     padding: 18px 0;
-    background: linear-gradient(180deg, rgba(11, 17, 29, 0.9), rgba(8, 12, 21, 0.9));
+    background: linear-gradient(180deg, rgba(16, 24, 40, 0.5), rgba(8, 12, 21, 0.62));
     border-right: 1px solid var(--line);
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
+    box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.02);
   }
 
+  /* 只有地图页的内容在侧栏底下，才需要真正的模糊 */
   .shell-map .rail {
-    background: rgba(8, 12, 21, 0.55);
+    background: rgba(8, 12, 21, 0.5);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
   }
 
   .rail-brand {
@@ -336,7 +361,8 @@ h3 {
   max-width: 1120px;
   margin: 0 auto;
   padding: 28px 16px calc(var(--dock-h) + var(--dock-gap) * 2 + 24px + env(safe-area-inset-bottom));
-  animation: page-in 0.4s var(--ease) both;
+  /* backwards：动画结束后不残留 transform（残留会让里面的固定背景失效） */
+  animation: page-in 0.4s var(--ease) backwards;
 }
 
 @media (min-width: 900px) {
@@ -422,7 +448,8 @@ h3 {
 
 .card {
   position: relative;
-  background: linear-gradient(180deg, var(--surface-2), var(--surface-1));
+  background: var(--card-bg);
+  box-shadow: var(--glass-edge);
   border: 1px solid var(--line);
   border-radius: var(--radius-l);
   padding: 20px;
@@ -865,29 +892,67 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 
 .ticket {
   --notch: 11px;
-  --perf-y: 0px;
+  /* 缺口圆心的纵向位置，由组件量出；默认在卡片外（无缺口） */
+  --perf-y: -100px;
   position: relative;
+  isolation: isolate;
   display: block;
   color: inherit;
   border-radius: var(--radius-l);
-  background:
-    radial-gradient(420px 120px at 50% 0%, rgba(255, 184, 77, 0.05), transparent 70%),
-    linear-gradient(180deg, #121b2c, #0c1320);
-  border: 1px solid var(--line);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset;
+  /* 边框和底色画在 ::before 上，好用 mask 挖出缺口；这里只占位保持尺寸 */
+  border: 1px solid transparent;
   transition:
     transform 0.25s var(--ease),
-    border-color 0.25s,
     box-shadow 0.25s;
+}
+
+.ticket::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  border-radius: inherit;
+  border: 1px solid var(--line);
+  background:
+    radial-gradient(420px 120px at 50% 0%, rgba(255, 184, 77, 0.05), transparent 70%),
+    linear-gradient(180deg, rgba(20, 30, 48, 0.9), rgba(12, 19, 32, 0.86));
+  box-shadow: var(--glass-edge);
+  transition: border-color 0.25s;
+  -webkit-mask:
+    radial-gradient(
+        circle var(--notch) at 0 calc(var(--perf-y) + 1.75px),
+        #0000 calc(100% - 0.5px),
+        #000 100%
+      )
+      left / 51% 100% no-repeat,
+    radial-gradient(
+        circle var(--notch) at 100% calc(var(--perf-y) + 1.75px),
+        #0000 calc(100% - 0.5px),
+        #000 100%
+      )
+      right / 51% 100% no-repeat;
+  mask:
+    radial-gradient(
+        circle var(--notch) at 0 calc(var(--perf-y) + 1.75px),
+        #0000 calc(100% - 0.5px),
+        #000 100%
+      )
+      left / 51% 100% no-repeat,
+    radial-gradient(
+        circle var(--notch) at 100% calc(var(--perf-y) + 1.75px),
+        #0000 calc(100% - 0.5px),
+        #000 100%
+      )
+      right / 51% 100% no-repeat;
 }
 
 .ticket.interactive:hover {
   transform: translateY(-2px);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.45);
+}
+
+.ticket.interactive:hover::before {
   border-color: rgba(255, 184, 77, 0.28);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.03) inset,
-    0 14px 34px rgba(0, 0, 0, 0.45),
-    0 0 0 1px rgba(255, 184, 77, 0.06);
 }
 
 .ticket-head {
@@ -1057,7 +1122,7 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   width: calc(var(--notch) * 2);
   height: calc(var(--notch) * 2);
   border-radius: 50%;
-  background: var(--bg);
+  /* 缺口本身已镂空，这里只描出缺口的边 */
   box-shadow: inset 0 0 0 1px var(--line);
 }
 
@@ -1254,9 +1319,33 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   display: flex;
   align-items: baseline;
   gap: 14px;
-  padding: 14px 0 12px;
-  margin-bottom: 4px;
-  background: linear-gradient(180deg, var(--bg) 70%, rgba(5, 8, 15, 0));
+  padding: 14px 0 18px;
+  margin-bottom: -2px;
+  isolation: isolate;
+}
+
+/* 吸顶的磨砂条：一层模糊 + 一层与页面相同的固定柔光。
+   没吸顶时底下就是柔光，两层叠上去看不出来；吸顶后压住滚过的票根，底部渐隐 */
+.year-head::before,
+.year-head::after {
+  content: "";
+  position: absolute;
+  inset: 0 -12px;
+  z-index: -1;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(180deg, #000 70%, transparent);
+  mask-image: linear-gradient(180deg, #000 70%, transparent);
+}
+
+.year-head::before {
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.year-head::after {
+  background: var(--ambient);
+  background-attachment: fixed;
+  opacity: 0.8;
 }
 
 .year-head h2 {
@@ -1346,9 +1435,9 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 .glass {
   background: var(--glass);
   border: 1px solid var(--line-2);
-  backdrop-filter: blur(20px) saturate(150%);
-  -webkit-backdrop-filter: blur(20px) saturate(150%);
-  box-shadow: var(--shadow);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-edge), var(--shadow);
 }
 
 .hud-card {
@@ -1440,11 +1529,11 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   min-width: 0;
 }
 
+/* 地图上的筛选按钮较多，每个都模糊会在地图每帧重绘时拖慢速度：用更实的底色代替 */
 .hud-filters .chip,
 .hud-filters .select {
-  background-color: var(--glass-strong);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  background-color: rgba(10, 15, 27, 0.86);
+  box-shadow: var(--glass-edge);
 }
 
 .hud-filters .chip.on {
@@ -1648,10 +1737,6 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   display: flex;
   flex-direction: column;
   gap: 10px;
-}
-
-.route-panel .ticket {
-  --bg: #0d1422;
 }
 
 @media (min-width: 900px) {
@@ -2030,8 +2115,7 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   flex-direction: column;
   background:
     radial-gradient(600px 260px at 100% 0%, rgba(255, 184, 77, 0.14), transparent 70%),
-    radial-gradient(500px 240px at 0% 100%, rgba(88, 120, 255, 0.12), transparent 70%),
-    linear-gradient(180deg, var(--surface-2), var(--surface-1));
+    radial-gradient(500px 240px at 0% 100%, rgba(88, 120, 255, 0.12), transparent 70%), var(--card-bg);
 }
 
 .hero-card .hero-arc {
@@ -2121,7 +2205,8 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 .tile {
   padding: 16px 18px;
   border-radius: var(--radius);
-  background: linear-gradient(180deg, var(--surface-2), var(--surface-1));
+  background: var(--card-bg);
+  box-shadow: var(--glass-edge);
   border: 1px solid var(--line);
   display: flex;
   flex-direction: column;
@@ -2264,11 +2349,11 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   pointer-events: none;
   padding: 10px 12px;
   border-radius: 12px;
-  background: var(--glass-strong);
+  background: var(--glass);
   border: 1px solid var(--line-2);
-  box-shadow: var(--shadow);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  box-shadow: var(--glass-edge), var(--shadow);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   font-size: 0.8rem;
   white-space: nowrap;
   transform: translate(-50%, calc(-100% - 10px));
@@ -2887,7 +2972,8 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   padding: 0;
   border-radius: var(--radius);
   border: 1px solid var(--line);
-  background: linear-gradient(180deg, var(--surface-2), var(--surface-1));
+  background: var(--card-bg);
+  box-shadow: var(--glass-edge);
   overflow: hidden;
 }
 
@@ -3004,10 +3090,11 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   margin-top: 16px;
   padding: 12px 14px;
   border-radius: var(--radius);
-  background: var(--glass-strong);
+  background: var(--glass);
   border: 1px solid var(--line-2);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  box-shadow: var(--glass-edge), var(--shadow);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
 }
 
 @media (min-width: 900px) {
@@ -3144,7 +3231,8 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   padding: 20px;
   border-radius: var(--radius-l);
   border: 1px solid var(--line);
-  background: linear-gradient(180deg, var(--surface-2), var(--surface-1));
+  background: var(--card-bg);
+  box-shadow: var(--glass-edge);
   min-width: 0;
 }
 
@@ -3443,4 +3531,47 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   font-size: 0.88rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+}
+
+/* —— 玻璃的降级 ——
+   不支持背景模糊、或系统要求降低透明度时，浮层改用实色，保证文字可读 */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root {
+    --glass: var(--glass-strong);
+  }
+
+  .dock {
+    background: rgba(10, 15, 27, 0.94);
+  }
+
+  .year-head::after {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --glass: rgba(11, 17, 29, 0.96);
+    --glass-strong: rgba(11, 17, 29, 0.98);
+    --card-bg: linear-gradient(180deg, var(--surface-2), var(--surface-1));
+  }
+
+  .dock,
+  .rail,
+  .shell-map .rail,
+  .glass,
+  .year-head::before,
+  .chart-tooltip,
+  .import-footer {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .dock {
+    background: rgba(10, 15, 27, 0.97);
+  }
+
+  .year-head::after {
+    opacity: 1;
+  }
 }

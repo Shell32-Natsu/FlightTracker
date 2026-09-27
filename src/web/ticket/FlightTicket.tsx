@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { Plane } from "lucide-react";
 import type { Flight } from "../../shared/types";
@@ -63,8 +64,28 @@ interface Props {
   className?: string;
 }
 
+/**
+ * 票根两侧的半圆缺口是真正镂空的（mask），能透出后面的玻璃和柔光背景；
+ * 缺口的纵向位置随内容高度变化，这里量出来写进 --perf-y。
+ */
+function usePerforation(enabled: boolean) {
+  const ref = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    const perf = el?.querySelector<HTMLElement>(".ticket-perf");
+    if (!el || !perf || !enabled) return;
+    const update = () => el.style.setProperty("--perf-y", `${perf.offsetTop}px`);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [enabled]);
+  return ref;
+}
+
 /** 登机牌样式的航班卡片。 */
 export function FlightTicket({ data: d, refData, unit = "km", to, compact, footer, className = "" }: Props) {
+  const ref = usePerforation(!compact);
   const dist = d.distanceKm != null ? distanceParts(d.distanceKm, unit) : null;
   const body = (
     <>
@@ -76,7 +97,9 @@ export function FlightTicket({ data: d, refData, unit = "km", to, compact, foote
         )}
         <div className="ticket-carrier">
           <span className="ticket-code">{d.airline ? flightCode(d) : "—"}</span>
-          {!compact && <span className="ticket-airline">{d.airline ? airlineName(d.airline, refData) : ""}</span>}
+          {!compact && (
+            <span className="ticket-airline">{d.airline ? airlineName(d.airline, refData) : ""}</span>
+          )}
         </div>
         <div className="ticket-date">
           <span>{formatDate(d.flightDate)}</span>
@@ -153,10 +176,12 @@ export function FlightTicket({ data: d, refData, unit = "km", to, compact, foote
 
   const cls = `ticket${compact ? " compact" : ""} ${className}`;
   return to ? (
-    <Link className={`${cls} interactive`} to={to}>
+    <Link ref={ref as React.Ref<HTMLAnchorElement>} className={`${cls} interactive`} to={to}>
       {body}
     </Link>
   ) : (
-    <div className={cls}>{body}</div>
+    <div ref={ref as React.Ref<HTMLDivElement>} className={cls}>
+      {body}
+    </div>
   );
 }
