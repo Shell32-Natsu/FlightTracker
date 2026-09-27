@@ -29,7 +29,7 @@ export interface Timeline {
 }
 
 export const TIMING = {
-  intro: 2.4,
+  intro: 2.8,
   /** 每段航程按距离缩放，限制在 2–6 秒 */
   kmPerSecond: 1800,
   cruiseMin: 2,
@@ -39,8 +39,8 @@ export const TIMING = {
   /** 同一机场转机 */
   transfer: 0.5,
   /** 下一段不从上一段的到达机场出发（例如中间坐了火车）：镜头飞过去 */
-  reposition: 1.2,
-  outroZoom: 1.2,
+  reposition: 1.6,
+  outroZoom: 1.6,
   endCard: 2.2,
 };
 
@@ -79,7 +79,39 @@ export const smoothstep = (a: number, b: number, x: number) => {
   return u * u * (3 - 2 * u);
 };
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
+const easeOut = (x: number) => 1 - (1 - clamp01(x)) ** 3;
+const easeOutQuad = (x: number) => 1 - (1 - clamp01(x)) ** 2;
+/** 慢起、快中段、慢收的缩放曲线；比三次方更“有冲劲”，但最大速度仍可控 */
+const easeInOutSine = (x: number) => (1 - Math.cos(Math.PI * clamp01(x))) / 2;
+/** 0 → 峰值 → 0 的平滑鼓包（sin²），用来做推近 / 呼吸，两端导数为 0，衔接处不跳。 */
+const bump = (x: number) => (x <= 0 || x >= 1 ? 0 : Math.sin(Math.PI * x) ** 2);
 const logLerp = (a: number, b: number, t: number) => Math.exp(Math.log(a) + (Math.log(b) - Math.log(a)) * t);
+
+/**
+ * 镜头的“表演”参数：推拉幅度都相对近景缩放。
+ * 所有额外动作在分段的首尾都回到 0，保证分段衔接处镜头连续。
+ */
+export const CAMERA = {
+  /** 片头先比全景再远一点，缓缓推进 */
+  introWide: 0.86,
+  /** 起飞后拉远、降落前推近的时长（秒），以及中间最少停留 */
+  pullOut: 1.4,
+  pushIn: 1.3,
+  minHold: 0.6,
+  /** 起飞瞬间推近 */
+  takeoffPunch: 0.18,
+  /** 巡航时的呼吸缩放幅度和周期（秒） */
+  breathe: 0.045,
+  breathePeriod: 4.5,
+  /** 镜头略微领先飞机（航程比例） */
+  lead: 0.06,
+  /** 着陆时的推近 */
+  landingPush: 0.16,
+  /** 转机时镜头缓慢推近 */
+  transferPush: 0.1,
+  /** 片尾卡片期间继续缓缓拉远 */
+  outroDrift: 0.9,
+};
 
 /** 镜头的缩放（由渲染器按投影和画面算好后传进来）。 */
 export interface Scales {
@@ -112,12 +144,31 @@ export function segmentAt(tl: Timeline, t: number): Segment {
   return tl.segments.find((s) => t < s.end) ?? tl.segments[tl.segments.length - 1];
 }
 
-/** 航段内：飞机在推拉镜头的中点起飞、中点落地；镜头先近后远再近。 */
-function legPhase(u: number, total: number) {
+/**
+ * 航段内的镜头：
+ *  起飞前推近（起飞推镜）→ 起飞后快速拉远、再慢慢稳住（ease-out）→ 巡航轻微呼吸、镜头领先飞机
+ *  → 降落前加速推近 → 着陆时再推一下。飞机在推拉段的中点起飞、中点落地。
+ */
+function legCamera(u: number, total: number, cruiseSeconds: number) {
   const a = TIMING.approach / total;
   const progress = easeInOut(clamp01((u - a * 0.5) / (1 - a)));
-  const zoomOut = smoothstep(0, a * 1.8, u) * (1 - smoothstep(1 - a * 1.8, 1, u));
-  return { progress, zoomOut };
+  // 拉远 / 推近按秒计；短航段压缩两者，保证中间至少停 0.6 秒看全程
+  let outDur = CAMERA.pullOut / total;
+  let inDur = CAMERA.pushIn / total;
+  const room = 1 - a - CAMERA.minHold / total;
+  const k = Math.min(1, room / (outDur + inDur));
+  outDur *= k;
+  inDur *= k;
+  const out = easeOutQuad((u - a * 0.5) / outDur);
+  const back = easeInOut((u - (1 - a * 0.5 - inDur)) / inDur);
+  const zoomOut = Math.max(0, Math.min(out, 1 - back));
+  const punch = CAMERA.takeoffPunch * bump(u / (a * 1.1));
+  const land = CAMERA.landingPush * bump((u - (1 - a * 0.9)) / (a * 0.9));
+  // 巡航呼吸：只在拉远时出现、只往外呼（不会比整段入画更近而切掉两端），长航段多呼吸几次
+  const cycles = Math.max(1, Math.round(cruiseSeconds / CAMERA.breathePeriod));
+  const phase = clamp01((u - a) / (1 - 2 * a));
+  const breathe = -CAMERA.breathe * zoomOut * bump(cycles * phase - Math.floor(cycles * phase));
+  return { progress, zoomOut, nearMul: 1 + punch + land, farMul: 1 + breathe };
 }
 
 export function frameAt(tl: Timeline, legs: Leg[], scales: Scales, t: number): FrameState {
@@ -137,23 +188,33 @@ export function frameAt(tl: Timeline, legs: Leg[], scales: Scales, t: number): F
 
   switch (seg.kind) {
     case "intro": {
-      const e = easeInOut(smoothstep(0.4, 1, u));
+      // 先在全景上停留、慢慢推进；随后镜头先平移、后俯冲（缩放比平移晚半拍）
+      const s0 = scales.overview * CAMERA.introWide;
+      const hold = logLerp(s0, scales.overview, easeOut(u / 0.4));
+      const pan = easeInOutSine((u - 0.3) / 0.6);
+      const dive = easeInOutSine((u - 0.38) / 0.62);
       return {
         ...base,
-        center: geoInterpolate(scales.overviewCenter, legs[0].dep)(e) as LonLat,
-        scale: logLerp(scales.overview, scales.near, e),
+        center: geoInterpolate(scales.overviewCenter, legs[0].dep)(pan) as LonLat,
+        scale: logLerp(hold, scales.near, dive),
         depLabel: smoothstep(0.7, 1, u),
       };
     }
     case "leg": {
       const leg = legs[seg.leg];
-      const { progress, zoomOut } = legPhase(u, legDuration(leg.km));
-      const plane = geoInterpolate(leg.dep, leg.arr)(progress) as LonLat;
-      const mid = geoInterpolate(leg.dep, leg.arr)(0.5) as LonLat;
+      const total = legDuration(leg.km);
+      const cruise = (seg.end - seg.start) * (1 - (2 * TIMING.approach) / total);
+      const cam = legCamera(u, total, cruise);
+      const route = geoInterpolate(leg.dep, leg.arr);
+      const progress = cam.progress;
+      // 镜头看向飞机前方一点，拉远时逐渐移到航线中点
+      const lookAt = route(Math.min(1, progress + CAMERA.lead * cam.zoomOut)) as LonLat;
+      const mid = route(0.5) as LonLat;
       return {
         ...base,
-        center: geoInterpolate(plane, mid)(zoomOut) as LonLat,
-        scale: logLerp(scales.near, scales.leg[seg.leg], zoomOut),
+        // 平方：镜头拉得够远之后才移向中点，刚起飞时飞机不会被甩到画面边缘
+        center: geoInterpolate(lookAt, mid)(cam.zoomOut ** 2) as LonLat,
+        scale: logLerp(scales.near * cam.nearMul, scales.leg[seg.leg] * cam.farMul, cam.zoomOut),
         leg: seg.leg,
         progress,
         flying: progress > 0 && progress < 1,
@@ -165,36 +226,49 @@ export function frameAt(tl: Timeline, legs: Leg[], scales: Scales, t: number): F
       return {
         ...base,
         center: legs[seg.leg].dep,
-        scale: scales.near,
+        scale: scales.near * (1 + CAMERA.transferPush * bump(u)),
         leg: seg.leg - 1,
         progress: 1,
         depLabel: 1,
       };
     case "reposition": {
+      // 平移时先拉远再推近（弧形缩放），距离越远拉得越开
       const e = easeInOut(u);
       const from = legs[seg.leg - 1].arr;
       const to = legs[seg.leg].dep;
+      const far = Math.max(scales.overview, scales.near / (2 + geoDistanceDeg(from, to) / 8));
       return {
         ...base,
         center: geoInterpolate(from, to)(e) as LonLat,
-        scale: logLerp(scales.near, Math.max(scales.overview, scales.near / 3), Math.sin(Math.PI * e)),
+        scale: logLerp(scales.near, far, bump(u)),
         leg: seg.leg - 1,
         progress: 1,
         depLabel: smoothstep(0.6, 1, u),
       };
     }
     case "outro": {
+      // 快速拉回全景（ease-out），卡片出现后继续缓慢拉远
       const zoomPart = TIMING.outroZoom / (seg.end - seg.start || 1) || 0.4;
-      const e = easeInOut(smoothstep(0, zoomPart, u));
+      const e = easeOutQuad(u / zoomPart);
+      const pan = easeInOut(smoothstep(0, zoomPart, u));
+      const drift = logLerp(1, CAMERA.outroDrift, smoothstep(zoomPart * 0.6, 1, u));
       const last = legs[legs.length - 1];
       return {
         ...base,
-        center: geoInterpolate(last.arr, scales.overviewCenter)(e) as LonLat,
-        scale: logLerp(scales.near, scales.overview, e),
+        center: geoInterpolate(last.arr, scales.overviewCenter)(pan) as LonLat,
+        scale: logLerp(scales.near, scales.overview, e) * drift,
         leg: legs.length - 1,
         progress: 1,
         endCard: smoothstep(zoomPart * 0.7, zoomPart * 0.7 + 0.18, u),
       };
     }
   }
+}
+
+function geoDistanceDeg(a: LonLat, b: LonLat): number {
+  const r = Math.PI / 180;
+  const h =
+    Math.sin(((b[1] - a[1]) * r) / 2) ** 2 +
+    Math.cos(a[1] * r) * Math.cos(b[1] * r) * Math.sin(((b[0] - a[0]) * r) / 2) ** 2;
+  return (2 * Math.asin(Math.min(1, Math.sqrt(h)))) / r;
 }

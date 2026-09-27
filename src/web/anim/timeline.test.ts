@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildTimeline, frameAt, legDuration, TIMING, type Leg, type Scales } from "./timeline";
+import { buildTimeline, CAMERA, frameAt, legDuration, TIMING, type Leg, type Scales } from "./timeline";
 import { groupTrips, tripPath } from "./trips";
 import type { Flight } from "../../shared/types";
 
@@ -48,7 +48,8 @@ describe("镜头", () => {
 
   it("开场从全景推近到出发机场", () => {
     const f0 = frameAt(tl, legs, scales, 0);
-    expect(f0.scale).toBeCloseTo(scales.overview);
+    // 开场比全景再远一点，缓缓推进
+    expect(f0.scale).toBeCloseTo(scales.overview * CAMERA.introWide);
     const f1 = frameAt(tl, legs, scales, leg0.start - 0.001);
     expect(f1.scale).toBeCloseTo(scales.near, 0);
     expect(f1.center[0]).toBeCloseTo(PVG[0], 0);
@@ -57,7 +58,13 @@ describe("镜头", () => {
   it("航段：起飞近景 → 中途拉远看全程 → 降落近景，飞机单调前进", () => {
     const at = (u: number) => frameAt(tl, legs, scales, leg0.start + (leg0.end - leg0.start) * u);
     expect(at(0).scale).toBeCloseTo(scales.near, 0);
-    expect(at(0.5).scale).toBeCloseTo(scales.leg[0], 0);
+    // 中途拉远到整段入画（带轻微呼吸缩放）
+    const mid = at(0.5).scale / scales.leg[0];
+    expect(mid).toBeLessThanOrEqual(1 + 1e-9);
+    expect(mid).toBeGreaterThanOrEqual(1 - CAMERA.breathe - 1e-9);
+    // 起飞时先推近
+    const a = TIMING.approach / legDuration(legs[0].km);
+    expect(at(a * 0.4).scale).toBeGreaterThan(scales.near);
     expect(at(0.999).scale).toBeGreaterThan(scales.near * 0.9);
     let prev = -1;
     for (let u = 0; u <= 1; u += 0.05) {
@@ -69,9 +76,26 @@ describe("镜头", () => {
     expect(at(1).progress).toBeCloseTo(1, 3);
   });
 
+  it("镜头全程平滑：60 帧下相邻两帧没有跳变（含分段衔接处）", () => {
+    const dt = 1 / 60;
+    let prev = frameAt(tl, legs, scales, 0);
+    let worstZoom = 0;
+    let worstPan = 0;
+    for (let t = dt; t < tl.duration; t += dt) {
+      const f = frameAt(tl, legs, scales, t);
+      worstZoom = Math.max(worstZoom, Math.abs(Math.log(f.scale / prev.scale)));
+      worstPan = Math.max(worstPan, Math.hypot(f.center[0] - prev.center[0], f.center[1] - prev.center[1]));
+      prev = f;
+    }
+    // 每帧缩放变化 < 8%，平移 < 3°（测试里的缩放差距比真实画面更极端）
+    expect(worstZoom).toBeLessThan(Math.log(1.08));
+    expect(worstPan).toBeLessThan(3);
+  });
+
   it("片尾拉回全景并淡入统计卡片", () => {
     const end = frameAt(tl, legs, scales, tl.duration - 0.01);
-    expect(end.scale).toBeCloseTo(scales.overview, 0);
+    // 卡片出现后继续缓缓拉远
+    expect(end.scale).toBeCloseTo(scales.overview * CAMERA.outroDrift, 0);
     expect(end.endCard).toBeCloseTo(1);
     expect(end.progress).toBe(1);
   });
