@@ -1,0 +1,2 @@
+# 复制为 .dev.vars，本地开发时跳过 Cloudflare Access 校验
+DEV_SKIP_AUTH=true

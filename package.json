@@ -1,0 +1,52 @@
+{
+  "name": "flighttracker",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "npm run build && wrangler dev",
+    "deploy": "npm run build && wrangler deploy",
+    "test": "vitest run",
+    "typecheck": "tsc -b",
+    "refdata": "tsx scripts/build-refdata.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate:local": "wrangler d1 migrations apply flighttracker --local",
+    "db:migrate:remote": "wrangler d1 migrations apply flighttracker --remote",
+    "cf-typegen": "wrangler types"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.104.0",
+    "@turf/great-circle": "^7.4.0",
+    "drizzle-orm": "^0.45.3",
+    "hono": "^4.13.9",
+    "jose": "^6.2.12",
+    "maplibre-gl": "^6.11.2",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "react-router-dom": "^7.18.4",
+    "recharts": "^3.10.1",
+    "topojson-client": "^3.1.0",
+    "world-atlas": "^2.0.2",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.60.2",
+    "@cloudflare/workers-types": "^5.20260927.1",
+    "@photostructure/tz-lookup": "^11.7.0",
+    "@types/geojson": "^7946.0.16",
+    "@types/node": "^26.6.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@types/topojson-client": "^3.1.5",
+    "@types/topojson-specification": "^1.0.5",
+    "@vitejs/plugin-react": "^6.1.1",
+    "drizzle-kit": "^0.31.11",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.1",
+    "vitest": "^5.0.2",
+    "wrangler": "^4.141.0"
+  }
+}
