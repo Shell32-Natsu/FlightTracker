@@ -25,7 +25,6 @@ import { Logo } from "../ui/Logo";
 const ROADMAP = [
   { icon: ScanSearch, title: "航班号自动补全", desc: "输入航班号和日期，自动带出时间、机型和机尾号", tag: "M3" },
   { icon: MailPlus, title: "邮件转发导入", desc: "把确认邮件转发到专用地址，自动识别航段", tag: "M4" },
-  { icon: Image, title: "海报与卡片导出", desc: "年度海报、单次航班卡片、手机壁纸", tag: "M5" },
   { icon: Clapperboard, title: "航线动画", desc: "飞机沿航线飞行的短视频，导出 MP4", tag: "M6" },
 ];
 
@@ -73,6 +72,20 @@ export function SettingsPage() {
         <HomeAirportSetting />
 
         <ImportExportCard />
+
+        <section className="card">
+          <div className="setting-row">
+            <div>
+              <h2 className="section-title">
+                <Image size={18} className="faint" /> 海报与卡片
+              </h2>
+              <p>年度海报、生涯总览、单次航班卡片、手机壁纸，导出高清 PNG</p>
+            </div>
+            <Link to="/poster" className="button">
+              打开
+            </Link>
+          </div>
+        </section>
 
         <section className="card">
           <div className="card-head">

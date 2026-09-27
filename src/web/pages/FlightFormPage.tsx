@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeftRight, ChevronLeft, Trash2 } from "lucide-react";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { ArrowLeftRight, ChevronLeft, Image as ImageIcon, Trash2 } from "lucide-react";
 import { useCreateFlight, useDeleteFlight, useFlights, useUpdateFlight } from "../lib/api";
 import { useRefData, useWorldTopo, type RefData } from "../lib/refdata";
 import {
@@ -136,6 +136,11 @@ function FlightForm({ refData, flight }: { refData: RefData; flight?: Flight }) 
           <h1 className="page-title">{flight ? "编辑航班" : "添加航班"}</h1>
           <p className="page-sub">时间按机场当地时间填写，保存时自动换算并算好距离和时长。</p>
         </div>
+        {flight?.status === "confirmed" && (
+          <Link to={`/poster?template=card&flight=${flight.id}`} className="button">
+            <ImageIcon size={16} /> 生成卡片
+          </Link>
+        )}
       </header>
 
       <div className="form-layout">

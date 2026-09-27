@@ -13,6 +13,8 @@ import { Logo } from "./ui/Logo";
 // 地图（MapLibre）和统计页体积较大，按需加载
 const MapPage = lazy(() => import("./pages/MapPage").then((m) => ({ default: m.MapPage })));
 const StatsPage = lazy(() => import("./pages/StatsPage").then((m) => ({ default: m.StatsPage })));
+// 海报页带着中文字体和导出逻辑，单独按需加载
+const PosterPage = lazy(() => import("./pages/PosterPage").then((m) => ({ default: m.PosterPage })));
 
 export function App() {
   const pending = useFlights("pending");
@@ -51,6 +53,7 @@ export function App() {
             <Route path="/stats" element={<StatsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/import" element={<ImportPage />} />
+            <Route path="/poster" element={<PosterPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>

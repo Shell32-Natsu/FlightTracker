@@ -3107,3 +3107,235 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   flex-wrap: wrap;
   gap: 10px;
 }
+
+/* ==========================================================================
+   海报
+   ========================================================================== */
+
+.head-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.poster-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+@media (min-width: 1000px) {
+  .poster-layout {
+    grid-template-columns: 340px minmax(0, 1fr);
+  }
+
+  .poster-controls {
+    position: sticky;
+    top: 32px;
+  }
+}
+
+.poster-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 20px;
+  border-radius: var(--radius-l);
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--surface-2), var(--surface-1));
+  min-width: 0;
+}
+
+@media (max-width: 999px) {
+  .poster-controls {
+    order: 2;
+  }
+}
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.control-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--text-3);
+}
+
+.control-hint {
+  font-size: 0.78rem;
+  color: var(--text-3);
+}
+
+.template-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.template-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 4px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--line-2);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-2);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.template-option b {
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.template-option small {
+  font-size: 0.68rem;
+  color: var(--text-3);
+}
+
+.template-shape {
+  height: 36px;
+  max-width: 90%;
+  border-radius: 4px;
+  border: 1.5px solid currentColor;
+  opacity: 0.7;
+  margin-bottom: 4px;
+}
+
+.template-option:hover {
+  border-color: var(--line-3);
+  color: var(--text-1);
+}
+
+.template-option.on {
+  border-color: rgba(255, 184, 77, 0.6);
+  background: var(--gold-wash);
+  color: var(--text-1);
+}
+
+.template-option.on .template-shape {
+  color: var(--gold);
+  opacity: 1;
+}
+
+.palette-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.palette-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px 8px 8px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--text-2);
+  font-size: 0.9rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.palette-option svg {
+  margin-left: auto;
+  color: var(--gold);
+}
+
+.palette-option.on {
+  border-color: rgba(255, 184, 77, 0.5);
+  color: var(--text-1);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.palette-swatch {
+  width: 44px;
+  height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.palette-swatch i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.chips.wrap {
+  flex-wrap: wrap;
+  overflow: visible;
+  -webkit-mask-image: none;
+  mask-image: none;
+  padding-right: 0;
+}
+
+.poster-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.poster-actions .save-status {
+  justify-content: center;
+}
+
+.save-status.bad {
+  color: var(--danger);
+}
+
+.poster-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.poster-frame {
+  width: min(100%, calc(76vh * var(--ratio)));
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 1px var(--line-2),
+    0 30px 80px rgba(0, 0, 0, 0.55);
+  touch-action: pan-y;
+}
+
+.poster-frame.draggable {
+  cursor: grab;
+  touch-action: none;
+}
+
+.poster-frame.draggable:active {
+  cursor: grabbing;
+}
+
+.poster-frame svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.preview-note .link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 10px;
+}

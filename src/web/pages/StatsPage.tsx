@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
+  Image as ImageIcon,
   Building2,
   ChartColumn,
   Clock3,
@@ -86,16 +87,23 @@ export function StatsPage() {
             {stats.flights ? `${span} · ${stats.flights} 段航班` : "添加航班后，这里会出现你的飞行数据"}
           </p>
         </div>
-        <Segmented
-          value={unit}
-          onChange={setUnit}
-          size="sm"
-          ariaLabel="距离单位"
-          options={[
-            { value: "km", label: "公里" },
-            { value: "mi", label: "英里" },
-          ]}
-        />
+        <div className="head-actions">
+          <Segmented
+            value={unit}
+            onChange={setUnit}
+            size="sm"
+            ariaLabel="距离单位"
+            options={[
+              { value: "km", label: "公里" },
+              { value: "mi", label: "英里" },
+            ]}
+          />
+          {all.length > 0 && (
+            <Link to={filter.year ? `/poster?template=year&year=${filter.year}` : "/poster?template=overview"} className="button">
+              <ImageIcon size={16} /> 生成海报
+            </Link>
+          )}
+        </div>
       </header>
 
       {all.length > 0 && (
