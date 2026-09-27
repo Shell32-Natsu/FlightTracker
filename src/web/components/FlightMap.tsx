@@ -1,5 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import type {
+  ExpressionSpecification,
   GeoJSONSource,
   LngLatLike,
   Map as MapLibreMap,
@@ -66,6 +67,15 @@ const STYLE: StyleSpecification = {
   sources: {},
   layers: [{ id: "ocean", type: "background", paint: { "background-color": C.ocean } }],
 };
+
+/** 机场点半径：到访次数开方后线性插值（sqrt(count) 为 1 时 2.4px，为 6 时 5px）。图层和标签共用。 */
+const DOT = { from: 1, r0: 2.4, to: 6, r1: 5 };
+const DOT_RADIUS_EXPR = ["interpolate", ["linear"], ["sqrt", ["get", "count"]], DOT.from, DOT.r0, DOT.to, DOT.r1] as const;
+
+function dotRadius(count: number): number {
+  const t = (Math.sqrt(count) - DOT.from) / (DOT.to - DOT.from);
+  return DOT.r0 + (DOT.r1 - DOT.r0) * Math.min(1, Math.max(0, t));
+}
 
 const reducedMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 
@@ -246,7 +256,7 @@ export const FlightMap = forwardRef<FlightMapHandle, Props>(function FlightMap(
           "circle-color": "#ffffff",
           "circle-stroke-color": C.gold,
           "circle-stroke-width": 1.5,
-          "circle-radius": ["interpolate", ["linear"], ["sqrt", ["get", "count"]], 1, 2.4, 6, 5],
+          "circle-radius": DOT_RADIUS_EXPR as unknown as ExpressionSpecification,
           "circle-pitch-alignment": "map",
         },
       });
@@ -348,6 +358,8 @@ export const FlightMap = forwardRef<FlightMapHandle, Props>(function FlightMap(
         const label = document.createElement("span");
         const p = f.properties as { code: string; count: number; home: boolean };
         label.className = `airport-label${p.home ? " home" : ""}`;
+        // 标签底边贴着机场点上沿（点的半径 + 描边 + 3px），不同大小的点间距一致
+        label.style.marginBottom = `${dotRadius(p.count) + 4.5}px`;
         label.textContent = p.code;
         el.appendChild(label);
         if (p.home) {

@@ -1540,7 +1540,7 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   background: rgba(8, 13, 24, 0.75);
   border: 1px solid rgba(255, 255, 255, 0.1);
   display: block;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   white-space: nowrap;
   transition: opacity 0.25s;
 }
