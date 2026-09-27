@@ -9,17 +9,22 @@
     "run_worker_first": ["/api/*"]
   },
   "observability": { "enabled": true },
+  // 只通过自定义域名访问（前面有 Cloudflare Access）；
+  // 关掉 workers.dev 和预览地址，免得出现绕过 Access 的入口
+  "routes": [{ "pattern": "flights.xiadong.info", "custom_domain": true }],
+  "workers_dev": false,
+  "preview_urls": false,
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "flighttracker",
-      // `wrangler d1 create flighttracker` 之后把返回的 id 填在这里
+      // 部署时由 scripts/ci-configure.mjs 填入（不存在就先创建）；本地开发用不到真实 id
       "database_id": "00000000-0000-0000-0000-000000000000",
       "migrations_dir": "migrations"
     }
   ],
   "vars": {
-    // Cloudflare Access 团队域名和应用 AUD，见 README“部署”
+    // 部署时由 scripts/ci-configure.mjs 从 GitHub 仓库变量填入，见 README“部署”
     "ACCESS_TEAM_DOMAIN": "",
     "ACCESS_AUD": ""
   }

@@ -69,14 +69,42 @@ npm run build:demo    # 输出 dist-demo/：纯静态
 
 ## 部署
 
-1. 创建 D1 数据库，把返回的 `database_id` 填进 `wrangler.jsonc`：
-   ```bash
-   npx wrangler d1 create flighttracker
-   ```
-2. 对线上库执行迁移：`npm run db:migrate:remote`
-3. 部署：`npm run deploy`
-4. 在 Cloudflare Zero Trust 里为这个 Worker 建一个 **Access 应用**，覆盖全部入口（自定义域名、`*.workers.dev`、预览地址），策略只放行你自己的邮箱。
-5. 把 Access 的团队域名（如 `myteam.cloudflareaccess.com`）和应用的 **AUD Tag** 填进 `wrangler.jsonc` 的 `vars`（`ACCESS_TEAM_DOMAIN`、`ACCESS_AUD`），重新部署。Worker 会用它们再次校验 `Cf-Access-Jwt-Assertion`，防止绕过 Access 直接访问 API。
+推送到 `main` 后，`.github/workflows/deploy.yml` 自动完成：测试 → 确保 D1 数据库存在（第一次会创建）→ 数据库迁移 → 构建 → 部署 Worker。
+站点只挂在自定义域名 `flights.xiadong.info` 上（`wrangler.jsonc` 的 `routes`），`workers.dev` 和预览地址都关掉了，所有访问都经过 Cloudflare Access。
+
+### 一次性设置
+
+**1. Cloudflare API Token**（My Profile → API Tokens → Create Token）
+- 模板选 **Edit Cloudflare Workers**，再加一项权限 **Account → D1 → Edit**
+- Zone Resources 选 `xiadong.info`
+- 如果部署时绑定自定义域名报权限错误，再加 **Zone → DNS → Edit**
+
+**2. Cloudflare Access**（Zero Trust → Access → Applications → Add → Self-hosted）
+- 应用域名：`flights.xiadong.info`（整个域名，不填路径）
+- 策略：Action = Allow，Include → Emails = 你自己的邮箱
+- 保存后在应用的 Overview 里复制 **Application Audience (AUD) Tag**
+- 团队域名在 Zero Trust → Settings → Custom Pages（形如 `xxx.cloudflareaccess.com`）
+
+**3. GitHub 仓库配置**（Settings → Secrets and variables → Actions）
+
+| 类型 | 名称 | 值 |
+| --- | --- | --- |
+| Secret | `CLOUDFLARE_API_TOKEN` | 第 1 步的 token |
+| Secret | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare 首页右侧的 Account ID |
+| Variable | `ACCESS_TEAM_DOMAIN` | 如 `xxx.cloudflareaccess.com` |
+| Variable | `ACCESS_AUD` | 第 2 步的 AUD Tag |
+
+配好后在 Actions 里手动运行一次 **Deploy to Cloudflare**（或推送 `main`）。
+
+### 本地手动部署
+
+```bash
+npx wrangler login
+CLOUDFLARE_ACCOUNT_ID=… ACCESS_TEAM_DOMAIN=… ACCESS_AUD=… CLOUDFLARE_API_TOKEN=… node scripts/ci-configure.mjs
+npm run db:migrate:remote
+npm run deploy
+git checkout wrangler.jsonc   # 脚本改动只用于这次部署，不要提交
+```
 
 ## 约定
 
