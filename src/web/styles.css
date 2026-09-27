@@ -563,6 +563,30 @@ textarea.input:focus {
   color: var(--text-1);
 }
 
+/*
+ * iOS Safari 的日期/时间输入框有固有最小宽度，会无视 width:100% 撑出网格；
+ * 去掉原生外观并清掉最小宽度，值靠左对齐（iOS 默认居中）。
+ */
+input[type="date"].input,
+input[type="time"].input {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  line-height: 42px;
+}
+
+input[type="date"]::-webkit-date-and-time-value,
+input[type="time"]::-webkit-date-and-time-value {
+  text-align: left;
+  margin: 0;
+}
+
+input[type="date"].input.big {
+  line-height: 54px;
+}
+
 input[type="date"]::-webkit-calendar-picker-indicator,
 input[type="time"]::-webkit-calendar-picker-indicator {
   filter: invert(0.75);
@@ -1929,6 +1953,11 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 }
 
 @media (max-width: 519px) {
+  /* 航班号和日期（尤其 iOS 的“2026年10月24日”格式）放不进半宽，各占一行 */
+  .field.wide-mobile {
+    grid-column: 1 / -1;
+  }
+
   .fields.times {
     grid-template-columns: minmax(0, 1fr);
   }

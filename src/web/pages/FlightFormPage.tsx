@@ -155,7 +155,7 @@ function FlightForm({ refData, flight }: { refData: RefData; flight?: Flight }) 
               <span className="step">1</span> 航班
             </h2>
             <div className="fields">
-              <Field label="航班号" hint={form.airline ? refData.airlines[form.airline]?.name : "如 MU5101、UA 857"} ok={!!form.airline}>
+              <Field className="wide-mobile" label="航班号" hint={form.airline ? refData.airlines[form.airline]?.name : "如 MU5101、UA 857"} ok={!!form.airline}>
                 <input
                   className="input big"
                   required
@@ -168,7 +168,7 @@ function FlightForm({ refData, flight }: { refData: RefData; flight?: Flight }) 
                   autoFocus={!flight}
                 />
               </Field>
-              <Field label="起飞日期（当地）">
+              <Field label="起飞日期（当地）" className="wide-mobile">
                 <input
                   className="input big date"
                   type="date"
@@ -371,6 +371,7 @@ function Field({
   ok,
   bad,
   full,
+  className = "",
 }: {
   label: string;
   hint?: string;
@@ -378,9 +379,10 @@ function Field({
   ok?: boolean;
   bad?: boolean;
   full?: boolean;
+  className?: string;
 }) {
   return (
-    <label className={`field${full ? " full" : ""}`}>
+    <label className={`field${full ? " full" : ""} ${className}`}>
       <span className="field-label">{label}</span>
       {children}
       {hint !== undefined && <span className={`field-hint${bad ? " bad" : ok ? " ok" : ""}`}>{hint}</span>}
