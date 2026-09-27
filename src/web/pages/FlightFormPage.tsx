@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeftRight, ChevronLeft, Image as ImageIcon, Trash2 } from "lucide-react";
+import { ArrowLeftRight, ChevronLeft, Clapperboard, Image as ImageIcon, Trash2 } from "lucide-react";
 import { useCreateFlight, useDeleteFlight, useFlights, useUpdateFlight } from "../lib/api";
 import { useRefData, useWorldTopo, type RefData } from "../lib/refdata";
 import {
@@ -22,7 +22,12 @@ import { CABIN_LABEL, PURPOSE_LABEL, cityName } from "../lib/format";
 import { useUnit } from "../lib/useUnit";
 
 const OFFSETS = [-1, 0, 1, 2];
-const CABIN_SHORT: Record<string, string> = { economy: "经济", premium: "超经", business: "商务", first: "头等" };
+const CABIN_SHORT: Record<string, string> = {
+  economy: "经济",
+  premium: "超经",
+  business: "商务",
+  first: "头等",
+};
 
 export function AddFlightPage() {
   const ref = useRefData();
@@ -48,7 +53,9 @@ function FlightForm({ refData, flight }: { refData: RefData; flight?: Flight }) 
   const location = useLocation();
   // 从应用内进来就回到上一页；直接打开链接进来（没有上一页）就回航班列表
   const back = () =>
-    location.key !== "default" ? navigate(-1) : navigate(flight?.status === "pending" ? "/pending" : "/flights");
+    location.key !== "default"
+      ? navigate(-1)
+      : navigate(flight?.status === "pending" ? "/pending" : "/flights");
   const create = useCreateFlight();
   const update = useUpdateFlight();
   const del = useDeleteFlight();
@@ -137,9 +144,14 @@ function FlightForm({ refData, flight }: { refData: RefData; flight?: Flight }) 
           <p className="page-sub">时间按机场当地时间填写，保存时自动换算并算好距离和时长。</p>
         </div>
         {flight?.status === "confirmed" && (
-          <Link to={`/poster?template=card&flight=${flight.id}`} className="button">
-            <ImageIcon size={16} /> 生成卡片
-          </Link>
+          <div className="head-actions">
+            <Link to={`/poster?template=card&flight=${flight.id}`} className="button">
+              <ImageIcon size={16} /> 生成卡片
+            </Link>
+            <Link to={`/animation?flight=${flight.id}`} className="button">
+              <Clapperboard size={16} /> 航线动画
+            </Link>
+          </div>
         )}
       </header>
 
@@ -167,7 +179,12 @@ function FlightForm({ refData, flight }: { refData: RefData; flight?: Flight }) 
               <span className="step">1</span> 航班
             </h2>
             <div className="fields">
-              <Field className="wide-mobile" label="航班号" hint={form.airline ? refData.airlines[form.airline]?.name : "如 MU5101、UA 857"} ok={!!form.airline}>
+              <Field
+                className="wide-mobile"
+                label="航班号"
+                hint={form.airline ? refData.airlines[form.airline]?.name : "如 MU5101、UA 857"}
+                ok={!!form.airline}
+              >
                 <input
                   className="input big"
                   required
@@ -190,7 +207,12 @@ function FlightForm({ refData, flight }: { refData: RefData; flight?: Flight }) 
                 />
               </Field>
               <div className="route-inputs">
-                <Field label="出发" hint={airportHint(depCode, dep)} ok={!!dep} bad={depCode.length === 3 && !dep}>
+                <Field
+                  label="出发"
+                  hint={airportHint(depCode, dep)}
+                  ok={!!dep}
+                  bad={depCode.length === 3 && !dep}
+                >
                   <input
                     className="input big"
                     required
@@ -203,10 +225,21 @@ function FlightForm({ refData, flight }: { refData: RefData; flight?: Flight }) 
                     spellCheck={false}
                   />
                 </Field>
-                <button type="button" className="swap" onClick={swap} aria-label="交换出发和到达" title="交换出发和到达">
+                <button
+                  type="button"
+                  className="swap"
+                  onClick={swap}
+                  aria-label="交换出发和到达"
+                  title="交换出发和到达"
+                >
                   <ArrowLeftRight size={15} />
                 </button>
-                <Field label="到达" hint={airportHint(arrCode, arr)} ok={!!arr} bad={arrCode.length === 3 && !arr}>
+                <Field
+                  label="到达"
+                  hint={airportHint(arrCode, arr)}
+                  ok={!!arr}
+                  bad={arrCode.length === 3 && !arr}
+                >
                   <input
                     className="input big"
                     required
@@ -236,7 +269,12 @@ function FlightForm({ refData, flight }: { refData: RefData; flight?: Flight }) 
             </h2>
             <div className="fields times">
               <Field label="计划起飞">
-                <input className="input" type="time" value={form.schedDep} onChange={(e) => set("schedDep", e.target.value)} />
+                <input
+                  className="input"
+                  type="time"
+                  value={form.schedDep}
+                  onChange={(e) => set("schedDep", e.target.value)}
+                />
               </Field>
               <Field label="计划到达">
                 <TimeWithOffset
@@ -289,7 +327,12 @@ function FlightForm({ refData, flight }: { refData: RefData; flight?: Flight }) 
                 />
               </Field>
               <Field label="座位">
-                <input className="input" value={form.seat} onChange={(e) => set("seat", e.target.value)} placeholder="32K" />
+                <input
+                  className="input"
+                  value={form.seat}
+                  onChange={(e) => set("seat", e.target.value)}
+                  placeholder="32K"
+                />
               </Field>
               <Field label="舱位" full>
                 <Segmented
@@ -298,7 +341,10 @@ function FlightForm({ refData, flight }: { refData: RefData; flight?: Flight }) 
                   ariaLabel="舱位"
                   options={[
                     { value: "none", label: "未填" },
-                    ...CABINS.map((c) => ({ value: c, label: <span title={CABIN_LABEL[c]}>{CABIN_SHORT[c]}</span> })),
+                    ...CABINS.map((c) => ({
+                      value: c,
+                      label: <span title={CABIN_LABEL[c]}>{CABIN_SHORT[c]}</span>,
+                    })),
                   ]}
                 />
               </Field>
@@ -313,7 +359,11 @@ function FlightForm({ refData, flight }: { refData: RefData; flight?: Flight }) 
                   ]}
                 />
               </Field>
-              <Field label="实际承运航司" hint={refData.airlines[form.operatingAirline.toUpperCase()]?.name ?? "代码共享时填写"} ok>
+              <Field
+                label="实际承运航司"
+                hint={refData.airlines[form.operatingAirline.toUpperCase()]?.name ?? "代码共享时填写"}
+                ok
+              >
                 <input
                   className="input"
                   value={form.operatingAirline}
@@ -331,7 +381,12 @@ function FlightForm({ refData, flight }: { refData: RefData; flight?: Flight }) 
                 />
               </Field>
               <Field label="备注" full>
-                <textarea className="input" rows={2} value={form.notes} onChange={(e) => set("notes", e.target.value)} />
+                <textarea
+                  className="input"
+                  rows={2}
+                  value={form.notes}
+                  onChange={(e) => set("notes", e.target.value)}
+                />
               </Field>
             </div>
           </section>
@@ -410,7 +465,12 @@ function TimeWithOffset(props: {
 }) {
   return (
     <div className="time-offset">
-      <input className="input" type="time" value={props.time} onChange={(e) => props.onTime(e.target.value)} />
+      <input
+        className="input"
+        type="time"
+        value={props.time}
+        onChange={(e) => props.onTime(e.target.value)}
+      />
       <select
         className="select"
         aria-label="相对起飞日期"

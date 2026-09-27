@@ -5,6 +5,7 @@ import {
   Building2,
   ChartColumn,
   Clock3,
+  Clapperboard,
   Flag as FlagIcon,
   MapPin,
   Moon,
@@ -76,7 +77,11 @@ export function StatsPage() {
   if (!stats || !ref.data) return <Loading />;
 
   const years = stats.years.map((y) => y.year);
-  const span = years.length ? (years[0] === years.at(-1) ? `${years[0]}` : `${years[0]} – ${years.at(-1)}`) : "";
+  const span = years.length
+    ? years[0] === years.at(-1)
+      ? `${years[0]}`
+      : `${years[0]} – ${years.at(-1)}`
+    : "";
 
   return (
     <div className="page">
@@ -99,8 +104,16 @@ export function StatsPage() {
             ]}
           />
           {all.length > 0 && (
-            <Link to={filter.year ? `/poster?template=year&year=${filter.year}` : "/poster?template=overview"} className="button">
+            <Link
+              to={filter.year ? `/poster?template=year&year=${filter.year}` : "/poster?template=overview"}
+              className="button"
+            >
               <ImageIcon size={16} /> 生成海报
+            </Link>
+          )}
+          {all.length > 0 && (
+            <Link to={filter.year ? `/animation?year=${filter.year}` : "/animation"} className="button">
+              <Clapperboard size={16} /> 航线动画
             </Link>
           )}
         </div>
@@ -128,7 +141,14 @@ export function StatsPage() {
           <Empty title="没有符合条件的航班">换个年份或航司看看。</Empty>
         )
       ) : (
-        <StatsBody flights={shown} stats={stats} refData={ref.data} unit={unit} year={filter.year} prevKm={prevKm} />
+        <StatsBody
+          flights={shown}
+          stats={stats}
+          refData={ref.data}
+          unit={unit}
+          year={filter.year}
+          prevKm={prevKm}
+        />
       )}
     </div>
   );
@@ -173,8 +193,8 @@ function StatsBody({
           </div>
           {delta !== undefined && year !== undefined && (
             <div className="hero-delta">
-              {delta >= 0 ? <TrendingUp size={15} /> : <TrendingDown size={15} />}
-              较 {year - 1} 年 {delta >= 0 ? "+" : "−"}
+              {delta >= 0 ? <TrendingUp size={15} /> : <TrendingDown size={15} />}较 {year - 1} 年{" "}
+              {delta >= 0 ? "+" : "−"}
               {Math.abs(Math.round(delta * 100))}%
             </div>
           )}
@@ -192,7 +212,12 @@ function StatsBody({
         </section>
 
         <div className="tiles">
-          <Tile icon={<PlaneTakeoff size={14} />} label="航段" value={stats.flights} sub={`平均 ${avg.value} ${avg.unit}`} />
+          <Tile
+            icon={<PlaneTakeoff size={14} />}
+            label="航段"
+            value={stats.flights}
+            sub={`平均 ${avg.value} ${avg.unit}`}
+          />
           <Tile
             icon={<Clock3 size={14} />}
             label="飞行时长"
@@ -200,7 +225,12 @@ function StatsBody({
             unit="小时"
             sub={`平均 ${Math.round(stats.durationMin / stats.flights / 6) / 10} 小时/段`}
           />
-          <Tile icon={<MapPin size={14} />} label="机场" value={stats.airports.length} sub={topName(stats.airports, (k) => `${k} 最常去`)} />
+          <Tile
+            icon={<MapPin size={14} />}
+            label="机场"
+            value={stats.airports.length}
+            sub={topName(stats.airports, (k) => `${k} 最常去`)}
+          />
           <Tile
             icon={<FlagIcon size={14} />}
             label="国家/地区"
@@ -438,7 +468,11 @@ function TimeChart({
   const value = (r: (typeof rows)[number]) =>
     metric === "flights" ? r.flights : metric === "hours" ? Math.round(r.min / 60) : toDist(r.km);
   const fmt = (v: number) =>
-    metric === "flights" ? `${v} 段` : metric === "hours" ? `${v.toLocaleString()} 小时` : `${v.toLocaleString()} ${unit}`;
+    metric === "flights"
+      ? `${v} 段`
+      : metric === "hours"
+        ? `${v.toLocaleString()} 小时`
+        : `${v.toLocaleString()} ${unit}`;
 
   const data: Column[] = rows.map((r) => ({
     key: r.key,
@@ -457,7 +491,9 @@ function TimeChart({
       <div className="card-head">
         <h2 className="section-title">
           {byMonth ? `${year ?? stats.years[0].year} 年每月` : "每年"}
-          <span className="count">{metric === "flights" ? "航段数" : metric === "hours" ? "飞行小时" : `里程（${unit}）`}</span>
+          <span className="count">
+            {metric === "flights" ? "航段数" : metric === "hours" ? "飞行小时" : `里程（${unit}）`}
+          </span>
         </h2>
         <div style={{ display: "flex", gap: 8 }}>
           <Segmented
@@ -572,7 +608,10 @@ function RankCard({
             <span className="rank-main">
               <span className="rank-name">{label(r.key)}</span>
               <span className="rank-track">
-                <span className="rank-fill" style={{ width: `${(r.count / max) * 100}%`, animationDelay: `${i * 40}ms` }} />
+                <span
+                  className="rank-fill"
+                  style={{ width: `${(r.count / max) * 100}%`, animationDelay: `${i * 40}ms` }}
+                />
               </span>
             </span>
             <span className="rank-count">{r.count}</span>
@@ -588,7 +627,17 @@ function RankCard({
   );
 }
 
-function ShareRow({ name, note, count, total }: { name: string; note?: string; count: number; total: number }) {
+function ShareRow({
+  name,
+  note,
+  count,
+  total,
+}: {
+  name: string;
+  note?: string;
+  count: number;
+  total: number;
+}) {
   const pct = total ? Math.round((count / total) * 100) : 0;
   return (
     <div className="haul-row">

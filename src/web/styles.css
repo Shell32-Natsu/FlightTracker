@@ -3339,3 +3339,108 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   gap: 4px;
   margin-left: 10px;
 }
+
+/* —— 航线动画 —— */
+.template-grid.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9rem;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.check-row input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--gold);
+}
+
+.anim-frame {
+  position: relative;
+  background: #05080f;
+}
+
+.anim-frame canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: var(--ratio);
+  cursor: pointer;
+}
+
+.anim-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--text-3);
+  font-size: 0.85rem;
+}
+
+.player-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: min(100%, calc(76vh * var(--ratio, 0.5625)), 640px);
+  min-width: min(100%, 320px);
+}
+
+.player-bar .icon-button {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid var(--line-2);
+  background: var(--surface-2);
+  color: var(--text-1);
+  cursor: pointer;
+}
+
+.player-bar .icon-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.scrubber {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--gold);
+}
+
+.player-time {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8rem;
+  color: var(--text-3);
+}
+
+.export-progress {
+  position: relative;
+  height: 44px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--line-2);
+  background: var(--surface-1);
+  display: grid;
+  place-items: center;
+}
+
+.export-progress i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: linear-gradient(90deg, rgba(255, 212, 138, 0.25), rgba(255, 122, 92, 0.35));
+  transition: width 0.2s;
+}
+
+.export-progress span {
+  position: relative;
+  font-size: 0.88rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}

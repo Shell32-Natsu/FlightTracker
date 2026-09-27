@@ -15,6 +15,7 @@ const MapPage = lazy(() => import("./pages/MapPage").then((m) => ({ default: m.M
 const StatsPage = lazy(() => import("./pages/StatsPage").then((m) => ({ default: m.StatsPage })));
 // 海报页带着中文字体和导出逻辑，单独按需加载
 const PosterPage = lazy(() => import("./pages/PosterPage").then((m) => ({ default: m.PosterPage })));
+const AnimationPage = lazy(() => import("./pages/AnimationPage").then((m) => ({ default: m.AnimationPage })));
 
 export function App() {
   const pending = useFlights("pending");
@@ -54,6 +55,7 @@ export function App() {
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/import" element={<ImportPage />} />
             <Route path="/poster" element={<PosterPage />} />
+            <Route path="/animation" element={<AnimationPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>
@@ -72,7 +74,13 @@ export function App() {
   );
 }
 
-function RailLink(props: { to: string; icon: React.ReactNode; label: string; end?: boolean; badge?: number }) {
+function RailLink(props: {
+  to: string;
+  icon: React.ReactNode;
+  label: string;
+  end?: boolean;
+  badge?: number;
+}) {
   return (
     <NavLink to={props.to} end={props.end} className="rail-link">
       <span className="rail-icon">
@@ -84,7 +92,13 @@ function RailLink(props: { to: string; icon: React.ReactNode; label: string; end
   );
 }
 
-function DockLink(props: { to: string; icon: React.ReactNode; label: string; end?: boolean; badge?: number }) {
+function DockLink(props: {
+  to: string;
+  icon: React.ReactNode;
+  label: string;
+  end?: boolean;
+  badge?: number;
+}) {
   return (
     <NavLink to={props.to} end={props.end} className="dock-link">
       <span className="dock-icon">

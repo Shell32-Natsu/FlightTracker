@@ -13,7 +13,7 @@
 | M3 自动补全 | AeroDataBox 查询 + 缓存、CSV 导入导出 | CSV 导入导出 ✅（含 Flighty），补全待做 |
 | M4 邮件导入 | Email Routing、JSON-LD / LLM 解析、待确认页 | 待确认页已就绪 |
 | M5 图片导出 | D3 海报模板、字体内嵌、PNG 导出 | ✅ |
-| M6 航线动画 | 时间轴、镜头、MP4 导出 | — |
+| M6 航线动画 | Canvas 逐帧渲染、镜头推拉、WebCodecs 导出 MP4（不支持 H.264 时退回 WebM） | ✅ |
 
 ## 技术栈
 

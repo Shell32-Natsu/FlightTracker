@@ -125,9 +125,9 @@ export async function svgToPng(svg: SVGSVGElement, scale = 3): Promise<Blob> {
   }
 }
 
-/** 手机上优先用系统分享（可直接存进相册），否则下载。 */
+/** 手机上优先用系统分享（可直接存进相册），否则下载。图片和视频通用。 */
 export async function saveImage(blob: Blob, filename: string): Promise<"shared" | "downloaded"> {
-  const file = new File([blob], filename, { type: "image/png" });
+  const file = new File([blob], filename, { type: blob.type || "image/png" });
   const coarse = window.matchMedia?.("(pointer: coarse)").matches;
   if (coarse && navigator.canShare?.({ files: [file] })) {
     try {

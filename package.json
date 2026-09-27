@@ -28,6 +28,7 @@
     "jose": "^6.2.12",
     "lucide-react": "^1.48.0",
     "maplibre-gl": "^6.11.2",
+    "mediabunny": "^1.60.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-router-dom": "^7.18.4",

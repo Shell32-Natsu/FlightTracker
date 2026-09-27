@@ -23,9 +23,13 @@ import { Segmented } from "../ui/Segmented";
 import { Logo } from "../ui/Logo";
 
 const ROADMAP = [
-  { icon: ScanSearch, title: "航班号自动补全", desc: "输入航班号和日期，自动带出时间、机型和机尾号", tag: "M3" },
+  {
+    icon: ScanSearch,
+    title: "航班号自动补全",
+    desc: "输入航班号和日期，自动带出时间、机型和机尾号",
+    tag: "M3",
+  },
   { icon: MailPlus, title: "邮件转发导入", desc: "把确认邮件转发到专用地址，自动识别航段", tag: "M4" },
-  { icon: Clapperboard, title: "航线动画", desc: "飞机沿航线飞行的短视频，导出 MP4", tag: "M6" },
 ];
 
 export function SettingsPage() {
@@ -45,7 +49,10 @@ export function SettingsPage() {
             <FlaskConical size={18} />
             <div>
               <b>演示模式</b>
-              <p>航班是虚构的示例数据，改动只保存在当前页面，刷新后恢复初始状态。正式部署后数据存进 Cloudflare D1。</p>
+              <p>
+                航班是虚构的示例数据，改动只保存在当前页面，刷新后恢复初始状态。正式部署后数据存进 Cloudflare
+                D1。
+              </p>
             </div>
           </section>
         )}
@@ -82,6 +89,20 @@ export function SettingsPage() {
               <p>年度海报、生涯总览、单次航班卡片、手机壁纸，导出高清 PNG</p>
             </div>
             <Link to="/poster" className="button">
+              打开
+            </Link>
+          </div>
+        </section>
+
+        <section className="card">
+          <div className="setting-row">
+            <div>
+              <h2 className="section-title">
+                <Clapperboard size={18} className="faint" /> 航线动画
+              </h2>
+              <p>飞机沿真实航线飞过一次旅行或一整年，导出竖屏、方形或横屏短视频</p>
+            </div>
+            <Link to="/animation" className="button">
               打开
             </Link>
           </div>
@@ -234,7 +255,11 @@ function HomeAirportSetting() {
                   onChange={(e) => choose(e.target.value.trim().toUpperCase())}
                 />
                 <span className={`field-hint${invalid ? " bad" : valid(draft) ? " ok" : ""}`}>
-                  {invalid ? "机场表里没有这个三字码" : valid(draft) ? airportName(draft, ref.data) : "输入三个字母，如 PVG"}
+                  {invalid
+                    ? "机场表里没有这个三字码"
+                    : valid(draft)
+                      ? airportName(draft, ref.data)
+                      : "输入三个字母，如 PVG"}
                 </span>
               </label>
               {ranked.length > 0 && (
