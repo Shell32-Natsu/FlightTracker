@@ -1,5 +1,5 @@
-import { lazy, Suspense } from "react";
-import { NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { lazy, Suspense, useLayoutEffect } from "react";
+import { NavLink, Navigate, Route, Routes, useLocation, useNavigationType } from "react-router-dom";
 import { BarChart3, Earth, Inbox, Plus, Settings, TicketsPlane } from "lucide-react";
 import { FlightsPage } from "./pages/FlightsPage";
 import { AddFlightPage, EditFlightPage } from "./pages/FlightFormPage";
@@ -22,6 +22,7 @@ export function App() {
   const pendingCount = pending.data?.length ?? 0;
   const location = useLocation();
   const isMap = location.pathname === "/";
+  useScrollToTopOnNavigate(location.pathname);
 
   return (
     <div className={`shell${isMap ? " shell-map" : ""}`}>
@@ -72,6 +73,14 @@ export function App() {
       </nav>
     </div>
   );
+}
+
+/** 点进新页面时回到顶部；浏览器后退 / 前进（POP）保留原来的滚动位置。 */
+function useScrollToTopOnNavigate(pathname: string) {
+  const navType = useNavigationType();
+  useLayoutEffect(() => {
+    if (navType !== "POP") window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [pathname, navType]);
 }
 
 function RailLink(props: {

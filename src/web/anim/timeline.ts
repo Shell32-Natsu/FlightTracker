@@ -29,7 +29,7 @@ export interface Timeline {
 }
 
 export const TIMING = {
-  intro: 2.8,
+  intro: 3.2,
   /** 每段航程按距离缩放，限制在 2–6 秒 */
   kmPerSecond: 1800,
   cruiseMin: 2,
@@ -39,8 +39,8 @@ export const TIMING = {
   /** 同一机场转机 */
   transfer: 0.5,
   /** 下一段不从上一段的到达机场出发（例如中间坐了火车）：镜头飞过去 */
-  reposition: 1.6,
-  outroZoom: 1.6,
+  reposition: 2.2,
+  outroZoom: 2,
   endCard: 2.2,
 };
 
@@ -80,11 +80,16 @@ export const smoothstep = (a: number, b: number, x: number) => {
 };
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 const easeOut = (x: number) => 1 - (1 - clamp01(x)) ** 3;
-const easeOutQuad = (x: number) => 1 - (1 - clamp01(x)) ** 2;
 /** 慢起、快中段、慢收的缩放曲线；比三次方更“有冲劲”，但最大速度仍可控 */
 const easeInOutSine = (x: number) => (1 - Math.cos(Math.PI * clamp01(x))) / 2;
-/** 0 → 峰值 → 0 的平滑鼓包（sin²），两端导数为 0，衔接处不跳。 */
-const bump = (x: number) => (x <= 0 || x >= 1 ? 0 : Math.sin(Math.PI * x) ** 2);
+/**
+ * 缩放专用：四次方缓入缓出。起步慢、中段快、收尾慢，加速度明显；
+ * 在对数缩放上使用，视觉上是“先加速推进、再减速停稳”。
+ */
+const zoomEase = (x: number) => {
+  const u = clamp01(x);
+  return u < 0.5 ? 8 * u ** 4 : 1 - (-2 * u + 2) ** 4 / 2;
+};
 const logLerp = (a: number, b: number, t: number) => Math.exp(Math.log(a) + (Math.log(b) - Math.log(a)) * t);
 
 /**
@@ -94,8 +99,8 @@ export const CAMERA = {
   /** 片头先比全景再远一点，缓缓推进 */
   introWide: 0.86,
   /** 起飞后拉远、降落前推近的时长（秒），以及中间最少停留 */
-  pullOut: 1.5,
-  pushIn: 1.5,
+  pullOut: 1.8,
+  pushIn: 1.8,
   minHold: 0.6,
   /** 镜头略微领先飞机（航程比例） */
   lead: 0.06,
@@ -147,8 +152,8 @@ function legCamera(u: number, total: number) {
   const k = Math.min(1, (1 - a - CAMERA.minHold / total) / (outDur + inDur));
   outDur *= k;
   inDur *= k;
-  const out = easeInOutSine((u - a * 0.5) / outDur);
-  const back = easeInOutSine((u - (1 - a * 0.5 - inDur)) / inDur);
+  const out = zoomEase((u - a * 0.5) / outDur);
+  const back = zoomEase((u - (1 - a * 0.5 - inDur)) / inDur);
   return { progress, zoomOut: Math.max(0, Math.min(out, 1 - back)) };
 }
 
@@ -173,7 +178,7 @@ export function frameAt(tl: Timeline, legs: Leg[], scales: Scales, t: number): F
       const s0 = scales.overview * CAMERA.introWide;
       const hold = logLerp(s0, scales.overview, easeOut(u / 0.4));
       const pan = easeInOutSine((u - 0.3) / 0.6);
-      const dive = easeInOutSine((u - 0.38) / 0.62);
+      const dive = zoomEase((u - 0.35) / 0.65);
       return {
         ...base,
         center: geoInterpolate(scales.overviewCenter, legs[0].dep)(pan) as LonLat,
@@ -219,7 +224,8 @@ export function frameAt(tl: Timeline, legs: Leg[], scales: Scales, t: number): F
       return {
         ...base,
         center: geoInterpolate(from, to)(e) as LonLat,
-        scale: logLerp(scales.near, far, bump(u)),
+        // 先拉远再推近：sin² 弧线，两端缓起缓停
+        scale: logLerp(scales.near, far, Math.sin(Math.PI * u) ** 2),
         leg: seg.leg - 1,
         progress: 1,
         depLabel: smoothstep(0.6, 1, u),
@@ -228,7 +234,7 @@ export function frameAt(tl: Timeline, legs: Leg[], scales: Scales, t: number): F
     case "outro": {
       // 快速拉回全景（ease-out），卡片出现后继续缓慢拉远
       const zoomPart = TIMING.outroZoom / (seg.end - seg.start || 1) || 0.4;
-      const e = easeOutQuad(u / zoomPart);
+      const e = zoomEase(u / zoomPart);
       const pan = easeInOut(smoothstep(0, zoomPart, u));
       const drift = logLerp(1, CAMERA.outroDrift, smoothstep(zoomPart * 0.6, 1, u));
       const last = legs[legs.length - 1];
