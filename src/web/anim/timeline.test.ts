@@ -58,13 +58,22 @@ describe("镜头", () => {
   it("航段：起飞近景 → 中途拉远看全程 → 降落近景，飞机单调前进", () => {
     const at = (u: number) => frameAt(tl, legs, scales, leg0.start + (leg0.end - leg0.start) * u);
     expect(at(0).scale).toBeCloseTo(scales.near, 0);
-    // 中途拉远到整段入画（带轻微呼吸缩放）
-    const mid = at(0.5).scale / scales.leg[0];
-    expect(mid).toBeLessThanOrEqual(1 + 1e-9);
-    expect(mid).toBeGreaterThanOrEqual(1 - CAMERA.breathe - 1e-9);
-    // 起飞时先推近
-    const a = TIMING.approach / legDuration(legs[0].km);
-    expect(at(a * 0.4).scale).toBeGreaterThan(scales.near);
+    // 中途拉远到整段入画
+    expect(at(0.5).scale).toBeCloseTo(scales.leg[0], 6);
+    // 只缩放一次：先单调拉远，再单调推近，不会在机场附近来回推拉
+    let dir = -1;
+    let turns = 0;
+    let last = at(0).scale;
+    for (let u = 0.01; u <= 1; u += 0.01) {
+      const sc = at(u).scale;
+      if (Math.abs(sc - last) > 1e-6) {
+        const d = sc > last ? 1 : -1;
+        if (d !== dir) turns++;
+        dir = d;
+      }
+      last = sc;
+    }
+    expect(turns).toBe(1);
     expect(at(0.999).scale).toBeGreaterThan(scales.near * 0.9);
     let prev = -1;
     for (let u = 0; u <= 1; u += 0.05) {
@@ -74,6 +83,14 @@ describe("镜头", () => {
     }
     expect(at(0).progress).toBe(0);
     expect(at(1).progress).toBeCloseTo(1, 3);
+  });
+
+  it("转机时镜头停在近景不动", () => {
+    const transfer = tl.segments[2];
+    const a = frameAt(tl, legs, scales, transfer.start + 0.01).scale;
+    const b = frameAt(tl, legs, scales, (transfer.start + transfer.end) / 2).scale;
+    expect(a).toBeCloseTo(scales.near);
+    expect(b).toBeCloseTo(scales.near);
   });
 
   it("镜头全程平滑：60 帧下相邻两帧没有跳变（含分段衔接处）", () => {
