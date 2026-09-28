@@ -75,15 +75,16 @@ npm run build:demo    # 输出 dist-demo/：纯静态
 ### 一次性设置
 
 **1. Cloudflare API Token**（My Profile → API Tokens → Create Token）
-- 模板选 **Edit Cloudflare Workers**，再加一项权限 **Account → D1 → Edit**
-- Zone Resources 选 `xiadong.info`
-- 如果部署时绑定自定义域名报权限错误，再加 **Zone → DNS → Edit**
+- 模板选 **Edit Cloudflare Workers**，再加两项权限：**Account → D1 → Edit**、**Zone → DNS → Edit**（绑定自定义域名用）
+- Account Resources 选你的账号，Zone Resources 选 `xiadong.info`
+- 创建后 token 只显示一次，立即复制
 
-**2. Cloudflare Access**（Zero Trust → Access → Applications → Add → Self-hosted）
-- 应用域名：`flights.xiadong.info`（整个域名，不填路径）
-- 策略：Action = Allow，Include → Emails = 你自己的邮箱
-- 保存后在应用的 Overview 里复制 **Application Audience (AUD) Tag**
-- 团队域名在 Zero Trust → Settings → Custom Pages（形如 `xxx.cloudflareaccess.com`）
+**2. Cloudflare Access**（Zero Trust → Access controls → Applications → Create new application → Self-hosted and private）
+- 先确认 `xiadong.info` 的 DNS 里没有 `flights` 记录（部署时会自动创建）
+- Add public hostname：子域名 `flights`，域名 `xiadong.info`，路径留空
+- Access policies：新建策略，Action = Allow，Include → Emails = 你自己的邮箱
+- 保存后在应用的 Configure → Overview（或 Additional settings）里复制 **Application Audience (AUD) Tag**
+- 团队域名在 Zero Trust → Settings → Team name and domain（形如 `xxx.cloudflareaccess.com`）
 
 **3. GitHub 仓库配置**（Settings → Secrets and variables → Actions）
 
