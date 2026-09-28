@@ -11,6 +11,7 @@ import type {
   Purpose,
 } from "../../shared/types";
 import { DEFAULT_SETTINGS, SETTING_KEYS, type Settings } from "../../shared/settings";
+import { cachedTheme } from "./theme";
 import { assetUrl } from "./env";
 import { dedupeKey, flightsToCsv } from "../../shared/flightCsv";
 import { DEMO_FLIGHTS, DEMO_PENDING, DEMO_REGISTRATIONS } from "./demoData";
@@ -22,7 +23,8 @@ import { DEMO_FLIGHTS, DEMO_PENDING, DEMO_REGISTRATIONS } from "./demoData";
 
 let airports: Record<string, Airport> | null = null;
 let store: Flight[] | null = null;
-let settings: Settings = { ...DEFAULT_SETTINGS };
+// 演示版的设置只存在内存里；主题沿用本地缓存，刷新后不丢
+let settings: Settings = { ...DEFAULT_SETTINGS, theme: cachedTheme() };
 
 /** 演示用的邮件导入记录：两段国泰航段来自第一封，其余展示各种处理结果。 */
 const DEMO_EMAIL_ID = "demo-email-1";

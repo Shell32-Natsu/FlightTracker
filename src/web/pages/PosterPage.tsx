@@ -8,7 +8,8 @@ import { useUnit } from "../lib/useUnit";
 import { flightYear } from "../../shared/stats";
 import { ErrorBox, Empty, Loading } from "../components/Status";
 import { Segmented } from "../ui/Segmented";
-import { PALETTES, type PaletteId } from "../poster/palettes";
+import { PALETTES, PALETTE_FOR_THEME, type PaletteId } from "../poster/palettes";
+import { cachedTheme } from "../lib/theme";
 import { buildPosterData, type ColorBy } from "../poster/data";
 import { TEMPLATES, TEMPLATE_COMPONENTS, type TemplateId } from "../poster/templates";
 import { saveImage, svgToPng } from "../poster/exportPng";
@@ -24,7 +25,7 @@ export function PosterPage() {
   const [params] = useSearchParams();
 
   const [template, setTemplate] = useState<TemplateId>((params.get("template") as TemplateId) ?? "year");
-  const [paletteId, setPaletteId] = useState<PaletteId>("night");
+  const [paletteId, setPaletteId] = useState<PaletteId>(() => PALETTE_FOR_THEME[cachedTheme()]);
   const [colorBy, setColorBy] = useState<ColorBy>("single");
   const [year, setYear] = useState<number | null>(params.get("year") ? Number(params.get("year")) : null);
   const [scope, setScope] = useState<number | "all">("all");

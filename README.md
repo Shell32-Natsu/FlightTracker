@@ -19,7 +19,7 @@
 
 - 前端：Vite + React + TanStack Query + React Router
 - 地图：MapLibre GL 3D 地球（globe 投影）+ turf 大圆航线，不依赖外部瓦片；表单里的小地球用 d3-geo 正射投影
-- 视觉：深色“夜航”主题，Inter 可变字体（本地打包）、lucide 图标；统计图表为手写 SVG，无图表库
+- 视觉：三套主题（深色“夜航”、浅色、复古，设置页切换，跟随账号保存），Inter 可变字体（本地打包）、lucide 图标；统计图表为手写 SVG，无图表库。主题的颜色都是 CSS 变量（`styles.css` 里的 `:root[data-theme]`），地图等 JS 绘制部分的配色在 `src/web/lib/theme.ts`
 - 后端：Hono（Cloudflare Worker）、D1 + Drizzle ORM、jose 校验 Access JWT、zod 校验输入
 - 参考数据：OurAirports、OpenFlights、Natural Earth（world-atlas），由 `scripts/build-refdata.ts` 生成
 

@@ -15,11 +15,7 @@ export function AirlineBadge({ code, size = "md" }: { code: string; size?: "sm" 
     <span
       className={`airline-badge ${size}`}
       style={
-        {
-          "--badge-bg": `hsl(${h} 42% 17%)`,
-          "--badge-line": `hsl(${h} 45% 28%)`,
-          "--badge-ink": `hsl(${h} 90% 80%)`,
-        } as React.CSSProperties
+{ "--badge-h": h } as React.CSSProperties
       }
       aria-hidden
     >

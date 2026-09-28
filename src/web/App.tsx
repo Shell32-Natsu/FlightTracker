@@ -7,6 +7,7 @@ import { PendingPage } from "./pages/PendingPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { ImportPage } from "./pages/ImportPage";
 import { useFlights } from "./lib/api";
+import { useThemeSync } from "./lib/theme";
 import { Loading } from "./components/Status";
 import { Logo } from "./ui/Logo";
 
@@ -19,6 +20,7 @@ const AircraftPage = lazy(() => import("./pages/AircraftPage").then((m) => ({ de
 const AnimationPage = lazy(() => import("./pages/AnimationPage").then((m) => ({ default: m.AnimationPage })));
 
 export function App() {
+  useThemeSync();
   const pending = useFlights("pending");
   const pendingCount = pending.data?.length ?? 0;
   const location = useLocation();

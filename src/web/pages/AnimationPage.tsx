@@ -8,7 +8,8 @@ import { useUnit } from "../lib/useUnit";
 import { flightYear, resolveHomeAirport } from "../../shared/stats";
 import { ErrorBox, Empty, Loading } from "../components/Status";
 import { Segmented } from "../ui/Segmented";
-import { PALETTES, type PaletteId } from "../poster/palettes";
+import { PALETTES, PALETTE_FOR_THEME, type PaletteId } from "../poster/palettes";
+import { cachedTheme } from "../lib/theme";
 import { saveImage } from "../poster/exportPng";
 import { groupTrips, sortByDeparture } from "../anim/trips";
 import { createScene, loadSceneFonts, type ProjectionKind } from "../anim/renderer";
@@ -49,7 +50,7 @@ export function AnimationPage() {
   const [scope, setScope] = useState<Scope>(params.get("year") ? "year" : "trip");
   const [tripId, setTripId] = useState<string | null>(params.get("trip"));
   const [year, setYear] = useState<number | null>(params.get("year") ? Number(params.get("year")) : null);
-  const [paletteId, setPaletteId] = useState<PaletteId>("night");
+  const [paletteId, setPaletteId] = useState<PaletteId>(() => PALETTE_FOR_THEME[cachedTheme()]);
   const [projection, setProjection] = useState<ProjectionKind>("globe");
   const [aspect, setAspect] = useState<Aspect>("9:16");
   const [speed, setSpeed] = useState<(typeof SPEEDS)[number]["value"]>("1");

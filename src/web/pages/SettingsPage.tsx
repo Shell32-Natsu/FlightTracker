@@ -8,8 +8,11 @@ import {
   FlaskConical,
   Image,
   LocateFixed,
+  Palette,
   Ruler,
 } from "lucide-react";
+import { THEME_IDS } from "../../shared/settings";
+import { THEMES, useTheme } from "../lib/theme";
 import { DEMO } from "../lib/env";
 import { downloadExportCsv, useFlights, useSettings, useUpdateSettings } from "../lib/api";
 import { Link } from "react-router-dom";
@@ -65,6 +68,8 @@ export function SettingsPage() {
             />
           </div>
         </section>
+
+        <ThemeCard />
 
         <HomeAirportSetting />
 
@@ -307,6 +312,53 @@ function ImportExportCard() {
         </button>
       </div>
       {error && <div className="error-box">{error}</div>}
+    </section>
+  );
+}
+
+/** 外观：三种主题，卡片上画一小块预览（底色、地图色、强调色） */
+function ThemeCard() {
+  const [theme, setTheme] = useTheme();
+  return (
+    <section className="card">
+      <div className="setting-row">
+        <div>
+          <h2 className="section-title">
+            <Palette size={18} className="faint" /> 外观
+          </h2>
+          <p>整个网站的配色；新建海报和航线视频时默认用对应的配色</p>
+        </div>
+      </div>
+      <div className="theme-options" role="radiogroup" aria-label="主题">
+        {THEME_IDS.map((id) => {
+          const t = THEMES[id];
+          const [bg, map, accent] = t.swatch;
+          return (
+            <button
+              key={id}
+              type="button"
+              role="radio"
+              aria-checked={theme === id}
+              className={`theme-option${theme === id ? " on" : ""}`}
+              onClick={() => setTheme(id)}
+            >
+              <span className="theme-preview" style={{ background: bg }}>
+                <svg viewBox="0 0 120 64" aria-hidden>
+                  <circle cx="84" cy="40" r="30" fill={map} />
+                  <path d="M20 46 Q56 6 96 30" fill="none" stroke={accent} strokeWidth="3" strokeLinecap="round" />
+                  <circle cx="20" cy="46" r="3.5" fill={accent} />
+                  <rect x="10" y="10" width="34" height="6" rx="3" fill={accent} opacity="0.85" />
+                  <rect x="10" y="20" width="22" height="4" rx="2" fill={map} />
+                </svg>
+              </span>
+              <span className="theme-name">
+                {t.name} {theme === id && <Check size={14} />}
+              </span>
+              <small>{t.desc}</small>
+            </button>
+          );
+        })}
+      </div>
     </section>
   );
 }

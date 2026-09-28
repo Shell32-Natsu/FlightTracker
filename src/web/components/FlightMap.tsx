@@ -18,6 +18,7 @@ import { maplibregl } from "../lib/maplibre";
 import type { RefData } from "../lib/refdata";
 import { joinAntimeridian, unwrapGeometry } from "../lib/antimeridian";
 import { routeGradient } from "../lib/routeGradient";
+import { THEMES, useThemeColors, type ThemeColors } from "../lib/theme";
 
 export type MapProjection = "globe" | "mercator";
 
@@ -44,29 +45,36 @@ interface Props {
   onHoverRoute: (hover: RouteHover | null) => void;
 }
 
-const C = {
-  ocean: "#07101f",
-  land: "#111c30",
-  visited: "#1c3157",
-  border: "#1e2c47",
-  visitedBorder: "#2f4a78",
-  graticule: "rgba(140,170,220,0.06)",
-  gold: "#ffcf7a",
-  coral: "#ff7a5c",
-  selected: "#ffffff",
-};
+/** 初始配色（夜航主题）；换主题时由下面的 effect 改写各图层的颜色 */
+const C = THEMES.night.colors.map;
+
+/** 各图层随主题变化的颜色 */
+function themePaint(map: MapLibreMap, c: ThemeColors["map"]) {
+  map.setPaintProperty("ocean", "background-color", c.ocean);
+  map.setPaintProperty("graticule", "line-color", c.graticule);
+  map.setPaintProperty("countries-fill", "fill-color", ["case", ["get", "visited"], c.visited, c.land]);
+  map.setPaintProperty("countries-line", "line-color", ["case", ["get", "visited"], c.visitedBorder, c.border]);
+  map.setPaintProperty("routes-selected", "line-color", c.selected);
+  map.setPaintProperty("airports-halo", "circle-color", c.airport);
+  map.setPaintProperty("airports-dot", "circle-stroke-color", c.airport);
+  map.setPaintProperty("airports-dot", "circle-color", c.ocean === C.ocean ? "#ffffff" : c.land);
+  map.setSky({
+    "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 0, c.atmosphere, 4, c.atmosphere * 0.9, 7, 0],
+  });
+}
 
 const EMPTY: FeatureCollection = { type: "FeatureCollection", features: [] };
 
-const STYLE: StyleSpecification = {
+/** 底图样式：海洋底色随主题，其余图层加载后再加 */
+const styleFor = (c: ThemeColors["map"]): StyleSpecification => ({
   version: 8,
   projection: { type: "globe" },
   sky: {
-    "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 0, 1, 4, 0.9, 7, 0],
+    "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 0, c.atmosphere, 4, c.atmosphere * 0.9, 7, 0],
   },
   sources: {},
-  layers: [{ id: "ocean", type: "background", paint: { "background-color": C.ocean } }],
-};
+  layers: [{ id: "ocean", type: "background", paint: { "background-color": c.ocean } }],
+});
 
 /** 机场点半径：到访次数开方后线性插值（sqrt(count) 为 1 时 2.4px，为 6 时 5px）。图层和标签共用。 */
 const DOT = { from: 1, r0: 2.4, to: 6, r1: 5 };
@@ -104,6 +112,9 @@ export const FlightMap = forwardRef<FlightMapHandle, Props>(function FlightMap(
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const [ready, setReady] = useState(false);
+  const colors = useThemeColors();
+  const colorsRef = useRef(colors.map);
+  const paintedColors = useRef<ThemeColors | null>(null);
   const callbacks = useRef({ onSelectRoute, onHoverRoute });
   callbacks.current = { onSelectRoute, onHoverRoute };
 
@@ -155,7 +166,7 @@ export const FlightMap = forwardRef<FlightMapHandle, Props>(function FlightMap(
     const [lon, lat] = view.center as [number, number];
     const map = new maplibregl.Map({
       container: container.current!,
-      style: STYLE,
+      style: styleFor(colorsRef.current),
       // 入场：从东侧转过来并略微推近
       center: [lon + 70, lat],
       zoom: view.zoom - 0.4,
@@ -241,7 +252,7 @@ export const FlightMap = forwardRef<FlightMapHandle, Props>(function FlightMap(
         type: "circle",
         source: "airports",
         paint: {
-          "circle-color": C.gold,
+          "circle-color": C.airport,
           "circle-opacity": 0.16,
           "circle-blur": 0.7,
           "circle-radius": ["interpolate", ["linear"], ["sqrt", ["get", "count"]], 1, 8, 6, 20],
@@ -254,7 +265,7 @@ export const FlightMap = forwardRef<FlightMapHandle, Props>(function FlightMap(
         source: "airports",
         paint: {
           "circle-color": "#ffffff",
-          "circle-stroke-color": C.gold,
+          "circle-stroke-color": C.airport,
           "circle-stroke-width": 1.5,
           "circle-radius": DOT_RADIUS_EXPR as unknown as ExpressionSpecification,
           "circle-pitch-alignment": "map",
@@ -362,13 +373,29 @@ export const FlightMap = forwardRef<FlightMapHandle, Props>(function FlightMap(
     const step = (now: number) => {
       const t = drawMs ? Math.min(1, (now - start) / drawMs) : 1;
       const p = easeOutCubic(t);
-      map.setPaintProperty("routes-line", "line-gradient", routeGradient(p, 1));
-      map.setPaintProperty("routes-glow", "line-gradient", routeGradient(p, 0.35));
+      const c = colorsRef.current;
+      map.setPaintProperty("routes-line", "line-gradient", routeGradient(p, 1, c.routeFrom, c.routeTo));
+      map.setPaintProperty("routes-glow", "line-gradient", routeGradient(p, 0.35, c.routeFrom, c.routeTo));
       if (t < 1) raf = requestAnimationFrame(step);
     };
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
   }, [layers, ready]);
+
+  // 换主题：改写各图层颜色（航线已画完时直接换成完整的新渐变）
+  useEffect(() => {
+    colorsRef.current = colors.map;
+    if (!ready) return;
+    const map = mapRef.current!;
+    themePaint(map, colors.map);
+    // 首次绘制时航线由入场动画负责；之后换主题直接换成完整的新渐变
+    if (paintedColors.current && paintedColors.current !== colors) {
+      const { routeFrom, routeTo } = colors.map;
+      map.setPaintProperty("routes-line", "line-gradient", routeGradient(1, 1, routeFrom, routeTo));
+      map.setPaintProperty("routes-glow", "line-gradient", routeGradient(1, 0.35, routeFrom, routeTo));
+    }
+    paintedColors.current = colors;
+  }, [colors, ready]);
 
   // 选中航线：高亮并把镜头移过去（给详情面板留出位置）
   useEffect(() => {

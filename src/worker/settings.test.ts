@@ -14,7 +14,9 @@ describe("settingsPatchSchema", () => {
     expect(settingsPatchSchema.safeParse({ homeAirport: "ZZZ" }).success).toBe(false);
     expect(settingsPatchSchema.safeParse({ homeAirport: "SF" }).success).toBe(false);
     expect(settingsPatchSchema.safeParse({ distanceUnit: "nm" }).success).toBe(false);
-    expect(settingsPatchSchema.safeParse({ theme: "light" }).success).toBe(false);
+    expect(settingsPatchSchema.safeParse({ fontSize: 16 }).success).toBe(false);
+    expect(settingsPatchSchema.safeParse({ theme: "neon" }).success).toBe(false);
+    expect(settingsPatchSchema.parse({ theme: "retro" })).toEqual({ theme: "retro" });
   });
 });
 
@@ -28,7 +30,7 @@ describe("settingsFromRows", () => {
         { key: "distanceUnit", value: '"mi"' },
         { key: "homeAirport", value: '"PEK"' },
       ]),
-    ).toEqual({ distanceUnit: "mi", homeAirport: "PEK", importSenders: [] });
+    ).toEqual({ distanceUnit: "mi", homeAirport: "PEK", importSenders: [], theme: "night" });
   });
   it("发件地址：小写、去重、校验格式", () => {
     expect(settingsPatchSchema.parse({ importSenders: [" A@Example.com", "a@example.com"] })).toEqual({

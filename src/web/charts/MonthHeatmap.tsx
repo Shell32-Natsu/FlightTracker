@@ -7,7 +7,7 @@ function cellColor(v: number, max: number): string | undefined {
   if (v === 0 || max === 0) return undefined;
   const t = max === 1 ? 1 : (v - 1) / (max - 1);
   const alpha = 0.28 + t * 0.72;
-  return `rgba(255, 184, 77, ${alpha.toFixed(3)})`;
+  return `rgb(var(--accent-rgb) / ${alpha.toFixed(3)})`;
 }
 
 export function MonthHeatmap({

@@ -13,10 +13,15 @@ function mix(a: number[], b: number[], t: number) {
  * 航线的 line-gradient：起点琥珀、终点珊瑚。
  * progress < 1 时只画出前面一段，用于入场动画。插值节点必须严格递增。
  */
-export function routeGradient(progress: number, alpha: number): ExpressionSpecification {
+export function routeGradient(
+  progress: number,
+  alpha: number,
+  from: number[] = GOLD,
+  to: number[] = CORAL,
+): ExpressionSpecification {
   const rgba = (c: number[]) => `rgba(${c.join(",")},${alpha})`;
   if (progress >= 1 - EDGE * 2) {
-    return ["interpolate", ["linear"], ["line-progress"], 0, rgba(GOLD), 1, rgba(CORAL)];
+    return ["interpolate", ["linear"], ["line-progress"], 0, rgba(from), 1, rgba(to)];
   }
   const p = Math.max(progress, EDGE);
   return [
@@ -24,9 +29,9 @@ export function routeGradient(progress: number, alpha: number): ExpressionSpecif
     ["linear"],
     ["line-progress"],
     0,
-    rgba(GOLD),
+    rgba(from),
     p,
-    rgba(mix(GOLD, CORAL, p)),
+    rgba(mix(from, to, p)),
     p + EDGE,
     "rgba(0,0,0,0)",
     1,

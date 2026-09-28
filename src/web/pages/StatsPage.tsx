@@ -720,7 +720,7 @@ function HeroArc() {
       <path
         d="M20 190 Q170 -30 340 120"
         fill="none"
-        stroke="rgba(255,255,255,0.12)"
+        style={{ stroke: "rgb(var(--fg-rgb) / 0.12)" }}
         strokeWidth="1"
         strokeDasharray="2 6"
         transform="translate(0 14)"

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DEFAULT_SETTINGS, SETTING_KEYS, type Settings } from "../shared/settings";
+import { DEFAULT_SETTINGS, SETTING_KEYS, THEME_IDS, type Settings } from "../shared/settings";
 import { findAirport } from "./airports";
 
 /** 每项设置的校验规则；PUT 时只允许这里列出的键。 */
@@ -17,6 +17,7 @@ export const settingsPatchSchema = z
       .array(z.string().trim().toLowerCase().pipe(z.email("发件地址格式不对")))
       .max(10, "最多 10 个发件地址")
       .transform((list) => [...new Set(list)]),
+    theme: z.enum(THEME_IDS),
   } satisfies { [K in keyof Settings]: z.ZodType<Settings[K], unknown> })
   .partial()
   .strict();

@@ -3,6 +3,7 @@ import { geoDistance, geoGraticule10, geoInterpolate, geoOrthographic, geoPath }
 import { feature, merge } from "topojson-client";
 import type { GeometryCollection, Topology } from "topojson-specification";
 import type { Airport } from "../../shared/types";
+import { useThemeColors } from "../lib/theme";
 
 interface Props {
   world: Topology | undefined;
@@ -58,6 +59,7 @@ export function RouteGlobe({ world, dep, arr, fallbackCenter = [110, 25], width 
   const radius = projection.scale();
   const [cx, cy] = projection.translate();
   const path = geoPath(projection);
+  const g = useThemeColors().globe;
   const route = a && b ? path({ type: "LineString", coordinates: [a, b] }) : null;
 
   const point = (p: [number, number] | undefined) => {
@@ -71,13 +73,13 @@ export function RouteGlobe({ world, dep, arr, fallbackCenter = [110, 25], width 
     <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="航线预览">
       <defs>
         <radialGradient id={`${id}-sphere`} cx="40%" cy="35%" r="75%">
-          <stop offset="0" stopColor="#12213d" />
-          <stop offset="1" stopColor="#070e1c" />
+          <stop offset="0" stopColor={g.sphereFrom} />
+          <stop offset="1" stopColor={g.sphereTo} />
         </radialGradient>
         <radialGradient id={`${id}-halo`} r="50%">
-          <stop offset="0.86" stopColor="rgba(120,170,255,0)" />
-          <stop offset="0.93" stopColor="rgba(120,170,255,0.16)" />
-          <stop offset="1" stopColor="rgba(120,170,255,0)" />
+          <stop offset="0.86" stopColor={`rgba(${g.halo},0)`} />
+          <stop offset="0.93" stopColor={`rgba(${g.halo},0.16)`} />
+          <stop offset="1" stopColor={`rgba(${g.halo},0)`} />
         </radialGradient>
         <linearGradient id={`${id}-route`} gradientUnits="userSpaceOnUse" x1={pa?.[0] ?? 0} y1={pa?.[1] ?? 0} x2={pb?.[0] ?? 1} y2={pb?.[1] ?? 1}>
           <stop offset="0" stopColor="#ffd48a" />
@@ -90,24 +92,24 @@ export function RouteGlobe({ world, dep, arr, fallbackCenter = [110, 25], width 
       {radius < size * 0.6 && (
         <circle cx={cx} cy={cy} r={radius * 1.16} fill={`url(#${id}-halo)`} />
       )}
-      <path d={path({ type: "Sphere" }) ?? ""} fill={`url(#${id}-sphere)`} stroke="rgba(140,180,255,0.18)" />
-      <path d={path(geoGraticule10()) ?? ""} fill="none" stroke="rgba(140,170,220,0.07)" strokeWidth={0.6} />
-      {land && <path d={path(land) ?? ""} fill="#1a2944" />}
-      {borders && <path d={path(borders) ?? ""} fill="none" stroke="#0c1628" strokeWidth={0.6} />}
+      <path d={path({ type: "Sphere" }) ?? ""} fill={`url(#${id}-sphere)`} stroke={g.rim} />
+      <path d={path(geoGraticule10()) ?? ""} fill="none" stroke={g.graticule} strokeWidth={0.6} />
+      {land && <path d={path(land) ?? ""} fill={g.land} />}
+      {borders && <path d={path(borders) ?? ""} fill="none" stroke={g.border} strokeWidth={0.6} />}
       {route && (
         <g key={`${dep?.code}-${arr?.code}`} className="globe-route">
-          <path d={route} fill="none" stroke="#ffb84d" strokeWidth={6} opacity={0.35} filter={`url(#${id}-glow)`} pathLength={1} />
+          <path d={route} fill="none" stroke={g.route} strokeWidth={6} opacity={0.35} filter={`url(#${id}-glow)`} pathLength={1} />
           <path d={route} fill="none" stroke={`url(#${id}-route)`} strokeWidth={2.2} strokeLinecap="round" pathLength={1} />
         </g>
       )}
       {[
-        [pa, dep?.code, "#ffffff"],
+        [pa, dep?.code, g.depDot],
         [pb, arr?.code, "#ff7a5c"],
       ].map(([p, code, color]) =>
         p ? (
           <g key={code as string} transform={`translate(${(p as number[])[0]},${(p as number[])[1]})`}>
             <circle r={9} fill={color as string} opacity={0.18} />
-            <circle r={3.6} fill={color as string} stroke="#0b111d" strokeWidth={1.5} />
+            <circle r={3.6} fill={color as string} stroke={g.dotStroke} strokeWidth={1.5} />
             <text y={-12} textAnchor="middle" className="globe-label">
               {code as string}
             </text>

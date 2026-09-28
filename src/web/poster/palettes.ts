@@ -1,3 +1,4 @@
+import type { ThemeId } from "../../shared/settings";
 /**
  * 海报配色。分类色和年份色阶都用 dataviz 校验脚本对各自底色验证过：
  *  - 航司（无序类别）：只给前 3 家航司上色（地图上航线会交叉，按“任意两两”校验），其余并入“其他”灰色
@@ -128,3 +129,6 @@ export function rampColor(ramp: string[], t: number): string {
 function hex(h: string): number[] {
   return [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
 }
+
+/** 海报 / 视频默认配色跟随界面主题 */
+export const PALETTE_FOR_THEME: Record<ThemeId, PaletteId> = { night: "night", light: "light", retro: "paper" };

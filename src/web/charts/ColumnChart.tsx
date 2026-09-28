@@ -82,8 +82,8 @@ export function ColumnChart({ data, format, height = 240, highlightKey }: Props)
       <svg height={height} role="img" aria-label="柱状图">
         <defs>
           <linearGradient id={`${id}-col`} x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0" stopColor="#ffd48a" />
-            <stop offset="1" stopColor="#f59e2e" />
+            <stop offset="0" style={{ stopColor: "var(--gold-2)" }} />
+            <stop offset="1" style={{ stopColor: "var(--gold-3)" }} />
           </linearGradient>
         </defs>
         {ticks.map((t) => (

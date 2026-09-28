@@ -8,6 +8,18 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <title>航迹 · 航班记录</title>
+    <script>
+      // 在页面渲染前套上上次选的主题，避免先闪一下深色（和 src/web/lib/theme.ts 保持一致）
+      try {
+        var t = localStorage.getItem("hangji-theme");
+        var chrome = { light: "#f3f5f9", retro: "#efe5cf" };
+        if (t === "light" || t === "retro") {
+          document.documentElement.dataset.theme = t;
+          document.documentElement.style.colorScheme = "light";
+          document.querySelector('meta[name="theme-color"]').setAttribute("content", chrome[t]);
+        }
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>
