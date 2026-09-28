@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { checkSender, normalizeAddress } from "./auth";
 import { htmlToText } from "./html";
 import { segmentsFromJsonLd } from "./jsonld";
-import { cabinFromName, normalizeSeat, splitFlightNumber } from "./segments";
+import { cabinFromName, normalizeSeat, splitFlightNumber, type ExtractedSegment } from "./segments";
 import { JSONLD_HTML } from "./fixtures";
 
 describe("JSON-LD FlightReservation", () => {
@@ -158,6 +158,56 @@ describe("到达时间换算", () => {
       NRT_LAX_KM,
     );
     expect(r).toBe("2026-10-21T20:25:00Z");
+  });
+
+  it("短途航班：次日 0 点这种离谱的到达时间不采用", async () => {
+    const { resolveArrivalUtc } = await import("./ingest");
+    // PVG 19:05 起飞（UTC+8）→ KIX，约 1,300 km，实际 22:25 左右到
+    const dep = "2025-01-06T11:05:00Z";
+    const kix = { tz: "Asia/Tokyo" };
+    const s = (arrTime: string) => ({ depDate: "2025-01-06", arrDate: "2025-01-06", arrTime });
+    expect(resolveArrivalUtc(s("00:00"), dep, kix, 1307)).toBeNull();
+    expect(resolveArrivalUtc(s("22:25"), dep, kix, 1307)).toBe("2025-01-06T13:25:00Z");
+  });
+
+  it("长途航班的正常时长都还在范围内", async () => {
+    const { resolveArrivalUtc } = await import("./ingest");
+    // 新加坡 → 纽约约 19 小时 40 分（15,340 km）
+    const sinJfk = { depDate: "2026-03-01", arrDate: "2026-03-02", arrTime: "06:00" };
+    expect(resolveArrivalUtc(sinJfk, "2026-03-01T15:20:00Z", { tz: "America/New_York" }, 15340)).toBe(
+      "2026-03-02T11:00:00Z",
+    );
+    // 旧金山 → 香港约 15 小时 55 分（11,100 km）
+    const sfoHkg = { depDate: "2026-03-01", arrDate: "2026-03-02", arrTime: "18:55" };
+    expect(resolveArrivalUtc(sfoHkg, "2026-03-01T19:00:00Z", { tz: "Asia/Hong_Kong" }, 11100)).toBe(
+      "2026-03-02T10:55:00Z",
+    );
+  });
+
+  it("同一封邮件里几段到达时间都是 0 点：当作占位值丢掉", async () => {
+    const { dropPlaceholderArrivals } = await import("./ingest");
+    const seg = (arrTime: string | null): ExtractedSegment => ({
+      airline: "NH",
+      flightNumber: "976",
+      depAirport: "PVG",
+      arrAirport: "KIX",
+      depDate: "2025-01-06",
+      depTime: "19:05",
+      arrDate: "2025-01-06",
+      arrTime,
+      confirmationCode: null,
+      seat: null,
+      cabin: null,
+      cancelled: false,
+    });
+    const two = [seg("00:00"), seg("00:00")];
+    dropPlaceholderArrivals(two);
+    expect(two.map((s) => s.arrTime)).toEqual([null, null]);
+    expect(two[0].notes?.[0]).toContain("占位");
+    // 只有一段 0 点：可能是真的，交给时长校验
+    const one = [seg("00:00"), seg("22:25")];
+    dropPlaceholderArrivals(one);
+    expect(one.map((s) => s.arrTime)).toEqual(["00:00", "22:25"]);
   });
 
   it("时间对不上（按距离不可能）时留空", async () => {

@@ -160,6 +160,7 @@ export async function processEmail(
       });
       return "ignored";
     }
+    dropPlaceholderArrivals(segments);
     await enrichSegments(env, segments);
     const count = await applySegments(env.DB, userId, email.id, segments);
     await finish({ parseStatus: "parsed", parseMethod: method, error: null, flightCount: count });
@@ -199,7 +200,8 @@ export function resolveArrivalUtc(
   // 按距离估算：巡航约 820 km/h + 地面 30 分钟；最快按约 1100 km/h（顺急流）算
   const expected = 30 + (km / 820) * 60;
   const min = Math.max(20, (km / 1100) * 60);
-  const max = Math.min(22 * 60, expected * 1.8 + 180);
+  // 上限：估算 × 1.3 再加 1 小时（逆风、排队、时刻表余量）。短途航班不能宽到把“次日 0 点”也算进来
+  const max = Math.min(22 * 60, expected * 1.3 + 60);
   const dates = [...new Set([seg.arrDate, ...[-1, 0, 1, 2].map((d) => addDays(seg.depDate, d))])].filter(
     (d): d is string => !!d,
   );
@@ -213,6 +215,23 @@ export function resolveArrivalUtc(
     if (!best || score < best.score) best = { utc, score };
   }
   return best?.utc ?? null;
+}
+
+const NOTE_PLACEHOLDER_ARRIVAL =
+  "邮件里的到达时间都是 12:00 AM，像是占位值（常见于代码共享航班），已留空，请核对";
+
+/**
+ * 有的行程单拿不到合作航司的到达时间，一律写成 12:00 AM（如美联航代订的全日空航段）。
+ * 同一封邮件里两段以上到达时间都是 0 点，就当作占位值丢掉。
+ */
+export function dropPlaceholderArrivals(segments: ExtractedSegment[]): void {
+  const midnight = segments.filter((s) => s.arrTime === "00:00");
+  if (midnight.length < 2) return;
+  for (const s of midnight) {
+    s.arrTime = null;
+    s.arrDate = null;
+    s.notes = [...(s.notes ?? []), NOTE_PLACEHOLDER_ARRIVAL];
+  }
 }
 
 /**
