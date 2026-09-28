@@ -278,6 +278,29 @@ describe("正文识别（LLM）", () => {
     expect(again?.notes).toContain("取消");
   });
 
+  it("跨日期变更线：模型把到达日期写错也能导入（SQ12 NRT→LAX 当天到）", async () => {
+    const r = await deliver(
+      aliceInbox,
+      mime({ from: "alice@gmail.com", to: aliceInbox, subject: "Tokyo", text: "x", auth: PASS }),
+      "alice@gmail.com",
+      stub([
+        seg({
+          airline: "SQ",
+          flightNumber: "12",
+          depAirport: "NRT",
+          arrAirport: "LAX",
+          depDate: "2026-10-20",
+          depTime: "17:25",
+          arrDate: "2026-10-19",
+          arrTime: "10:05",
+        }),
+      ]),
+    );
+    expect(r.status).toBe("parsed");
+    const sq = (await pending()).find((f) => f.airline === "SQ");
+    expect(sq).toMatchObject({ schedDepUtc: "2026-10-20T08:25:00Z", schedArrUtc: "2026-10-20T17:05:00Z" });
+  });
+
   it("机场三字码不对：整封失败，不写入任何航段", async () => {
     const before = (await pending()).length;
     const r = await deliver(

@@ -5,7 +5,8 @@ import { emails, flights, settings, users } from "../db/schema";
 import { findAirport } from "../airports";
 import { flightInputSchema, withDerived } from "../routes/flights";
 import { settingsFromRows } from "../settings";
-import { addDays, localToUtc } from "../../shared/time";
+import { addDays, localToUtc, minutesBetween } from "../../shared/time";
+import { greatCircleKm } from "../../shared/geo";
 import type { Env } from "../env";
 import { checkSender, normalizeAddress } from "./auth";
 import { htmlToText } from "./html";
@@ -179,17 +180,49 @@ export function llmExtractor(
 }
 
 /** 航段 → 航班表需要的字段（当地时间按机场时区换成 UTC）。 */
+const NOTE_ARRIVAL_DROPPED = "邮件里的到达时间和起飞时间对不上，已留空，请核对";
+
+/**
+ * 到达时间（UTC）。邮件和模型给的到达日期经常不可靠（跨日、跨日期变更线，如 NRT→LAX 当天早上到），
+ * 所以在“给定日期、起飞前一天到后两天”里挑一个航程时长合理、且最接近按距离估算的那天。
+ * 模型给的日期在合理范围内时优先采用。都不合理就留空，交给用户核对。
+ */
+export function resolveArrivalUtc(
+  seg: Pick<ExtractedSegment, "depDate" | "arrDate" | "arrTime">,
+  depUtc: string | null,
+  arr: { tz: string },
+  km: number,
+): string | null {
+  if (!seg.arrTime) return null;
+  if (!depUtc) return localToUtc(seg.arrDate ?? seg.depDate, seg.arrTime, arr.tz);
+  // 按距离估算：巡航约 820 km/h + 地面 30 分钟；最快按约 1100 km/h（顺急流）算
+  const expected = 30 + (km / 820) * 60;
+  const min = Math.max(20, (km / 1100) * 60);
+  const max = Math.min(22 * 60, expected * 1.8 + 180);
+  const dates = [...new Set([seg.arrDate, ...[-1, 0, 1, 2].map((d) => addDays(seg.depDate, d))])].filter(
+    (d): d is string => !!d,
+  );
+  let best: { utc: string; score: number } | null = null;
+  for (const date of dates) {
+    const utc = localToUtc(date, seg.arrTime, arr.tz);
+    const minutes = minutesBetween(depUtc, utc);
+    if (minutes < min || minutes > max) continue;
+    // 与估算时长的偏差；模型给的日期略占优（差不多时采用它）
+    const score = Math.abs(minutes - expected) - (date === seg.arrDate ? 90 : 0);
+    if (!best || score < best.score) best = { utc, score };
+  }
+  return best?.utc ?? null;
+}
+
+/** 航段 → 航班表需要的字段（当地时间按机场时区换成 UTC）。 */
 function toFlightFields(seg: ExtractedSegment) {
   const dep = findAirport(seg.depAirport);
   const arr = findAirport(seg.arrAirport);
   if (!dep) throw new ExtractionError(`机场表里没有出发机场 ${seg.depAirport}`);
   if (!arr) throw new ExtractionError(`机场表里没有到达机场 ${seg.arrAirport}`);
   const depUtc = seg.depTime ? localToUtc(seg.depDate, seg.depTime, dep.tz) : null;
-  let arrUtc = seg.arrTime ? localToUtc(seg.arrDate ?? seg.depDate, seg.arrTime, arr.tz) : null;
-  // 邮件只写了到达时间没写日期、而且早于起飞：视为次日到达
-  if (depUtc && arrUtc && !seg.arrDate && arrUtc <= depUtc && seg.arrTime) {
-    arrUtc = localToUtc(addDays(seg.depDate, 1), seg.arrTime, arr.tz);
-  }
+  const km = greatCircleKm(dep.lat, dep.lon, arr.lat, arr.lon);
+  const arrUtc = resolveArrivalUtc(seg, depUtc, arr, km);
   return {
     flightDate: seg.depDate,
     airline: seg.airline,
@@ -201,6 +234,7 @@ function toFlightFields(seg: ExtractedSegment) {
     seat: seg.seat,
     cabin: seg.cabin,
     confirmationCode: seg.confirmationCode,
+    notes: seg.arrTime && !arrUtc ? NOTE_ARRIVAL_DROPPED : null,
   };
 }
 
@@ -229,7 +263,8 @@ export async function applySegments(
     const fields = toFlightFields(seg);
     const parsed = flightInputSchema.safeParse({ ...fields, source: "email", status: "pending" });
     if (!parsed.success) {
-      const what = `${seg.airline}${seg.flightNumber} ${seg.depAirport}→${seg.arrAirport}`;
+      const when = `${seg.depDate} ${seg.depTime ?? "?"} → ${seg.arrDate ?? ""} ${seg.arrTime ?? "?"}`.trim();
+      const what = `${seg.airline}${seg.flightNumber} ${seg.depAirport}→${seg.arrAirport}（识别结果 ${when}）`;
       throw new ExtractionError(`${what}：${parsed.error.issues.map((i) => i.message).join("；")}`);
     }
     return { seg, values: parsed.data };
@@ -292,7 +327,10 @@ export async function applySegments(
           source: existing.source,
           status: "pending",
           emailId,
-          notes: appendNote(existing.notes, NOTE_UPDATED),
+          notes: appendNote(
+            values.notes ? appendNote(existing.notes, values.notes) : existing.notes,
+            NOTE_UPDATED,
+          ),
           updatedAt: now,
         })
         .where(eq(flights.id, existing.id));

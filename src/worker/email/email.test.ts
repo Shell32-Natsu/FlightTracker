@@ -120,3 +120,41 @@ describe("发件人校验", () => {
     expect(v).toMatchObject({ ok: false, reason: expect.stringContaining("不在") });
   });
 });
+
+describe("到达时间换算", () => {
+  // SQ12 这类跨日期变更线的航班：东京傍晚起飞，洛杉矶同一天上午到
+  const NRT_LAX_KM = 8750;
+  const depUtc = "2026-10-20T08:25:00Z"; // 东京 17:25（UTC+9）
+  const lax = { tz: "America/Los_Angeles" };
+  const seg = (arrDate: string | null, arrTime: string | null = "10:05") => ({
+    depDate: "2026-10-20",
+    arrDate,
+    arrTime,
+  });
+
+  it("到达日期缺失、写成次日或前一天，都能选出同一天到达", async () => {
+    const { resolveArrivalUtc } = await import("./ingest");
+    for (const d of [null, "2026-10-20", "2026-10-21", "2026-10-19"]) {
+      // 洛杉矶 10:05（夏令时 UTC−7）→ 17:05Z，飞行 8 小时 40 分
+      expect(resolveArrivalUtc(seg(d), depUtc, lax, NRT_LAX_KM)).toBe("2026-10-20T17:05:00Z");
+    }
+  });
+
+  it("模型给的次日到达合理时采用（如向西飞跨日）", async () => {
+    const { resolveArrivalUtc } = await import("./ingest");
+    // LAX 23:40 起飞 → 东京次日 05:25 到？不合理（太快），东京第三天 05:25 才合理
+    const r = resolveArrivalUtc(
+      { depDate: "2026-10-20", arrDate: "2026-10-22", arrTime: "05:25" },
+      "2026-10-21T06:40:00Z",
+      { tz: "Asia/Tokyo" },
+      NRT_LAX_KM,
+    );
+    expect(r).toBe("2026-10-21T20:25:00Z");
+  });
+
+  it("时间对不上（按距离不可能）时留空", async () => {
+    const { resolveArrivalUtc } = await import("./ingest");
+    expect(resolveArrivalUtc(seg("2026-10-20", "03:00"), depUtc, lax, NRT_LAX_KM)).toBeNull();
+    expect(resolveArrivalUtc(seg(null, null), depUtc, lax, NRT_LAX_KM)).toBeNull();
+  });
+});
