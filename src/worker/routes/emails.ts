@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { emails, users } from "../db/schema";
 import { allowedSenders, inboundTemplate, inboxAddress, newInboxToken, processEmail } from "../email/ingest";
@@ -15,6 +15,10 @@ const listColumns = {
   parseMethod: emails.parseMethod,
   error: emails.error,
   flightCount: emails.flightCount,
+  /** 这封邮件带来的航段里还有几段没确认 */
+  pendingCount: sql<number>`(SELECT count(*) FROM flights AS f WHERE f.email_id = "emails"."id" AND f.status = 'pending')`.mapWith(
+    Number,
+  ),
 };
 
 /** 取当前用户的收件 token，没有就生成一个。 */

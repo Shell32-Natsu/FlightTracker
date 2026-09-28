@@ -117,10 +117,13 @@ export function EmailImportCard() {
                     )}
                   </span>
                   <span className="email-actions">
-                    {e.parseStatus === "parsed" && e.flightCount > 0 && (
+                    {e.parseStatus === "parsed" && e.pendingCount > 0 && (
                       <Link to="/pending" className="link">
-                        去确认
+                        去确认{e.pendingCount > 1 ? ` ${e.pendingCount} 段` : ""}
                       </Link>
+                    )}
+                    {e.parseStatus === "parsed" && e.flightCount > 0 && e.pendingCount === 0 && (
+                      <span className="faint small-note">已确认</span>
                     )}
                     {(e.parseStatus === "failed" || e.parseStatus === "parsed") && (
                       <button

@@ -99,6 +99,7 @@ const emailLog = async (user = "alice") =>
     parseMethod: string | null;
     error: string | null;
     flightCount: number;
+    pendingCount: number;
     subject: string;
   }[];
 
@@ -170,6 +171,7 @@ describe("JSON-LD 邮件", () => {
       parseStatus: "parsed",
       parseMethod: "jsonld",
       flightCount: 1,
+      pendingCount: 1,
       subject: "Fwd: Your United trip",
     });
   });
@@ -181,6 +183,13 @@ describe("JSON-LD 邮件", () => {
     );
     expect(await pending()).toHaveLength(1);
     expect((await emailLog())[0]).toMatchObject({ parseStatus: "parsed", flightCount: 0 });
+  });
+
+  it("航段确认后，邮件记录不再显示待确认", async () => {
+    const [row] = await pending();
+    expect((await api("alice", `/flights/${row.id}/confirm`, { method: "POST" })).status).toBe(200);
+    const log = (await emailLog()).find((e) => e.subject === "Fwd: Your United trip");
+    expect(log).toMatchObject({ flightCount: 1, pendingCount: 0 });
   });
 });
 
