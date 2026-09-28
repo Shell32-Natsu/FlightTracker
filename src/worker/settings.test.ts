@@ -28,7 +28,13 @@ describe("settingsFromRows", () => {
         { key: "distanceUnit", value: '"mi"' },
         { key: "homeAirport", value: '"PEK"' },
       ]),
-    ).toEqual({ distanceUnit: "mi", homeAirport: "PEK" });
+    ).toEqual({ distanceUnit: "mi", homeAirport: "PEK", importSenders: [] });
+  });
+  it("发件地址：小写、去重、校验格式", () => {
+    expect(settingsPatchSchema.parse({ importSenders: [" A@Example.com", "a@example.com"] })).toEqual({
+      importSenders: ["a@example.com"],
+    });
+    expect(settingsPatchSchema.safeParse({ importSenders: ["not-an-email"] }).success).toBe(false);
   });
   it("忽略未知键和损坏的值", () => {
     expect(

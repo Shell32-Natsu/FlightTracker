@@ -13,6 +13,10 @@ export const settingsPatchSchema = z
       .pipe(z.string().regex(/^[A-Z]{3}$/, "机场需为 IATA 三字码"))
       .refine((v) => findAirport(v) !== undefined, "机场表里没有这个三字码")
       .nullable(),
+    importSenders: z
+      .array(z.string().trim().toLowerCase().pipe(z.email("发件地址格式不对")))
+      .max(10, "最多 10 个发件地址")
+      .transform((list) => [...new Set(list)]),
   } satisfies { [K in keyof Settings]: z.ZodType<Settings[K], unknown> })
   .partial()
   .strict();

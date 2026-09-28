@@ -1,0 +1,122 @@
+import { describe, expect, it } from "vitest";
+import { checkSender, normalizeAddress } from "./auth";
+import { htmlToText } from "./html";
+import { segmentsFromJsonLd } from "./jsonld";
+import { cabinFromName, splitFlightNumber } from "./segments";
+import { JSONLD_HTML } from "./fixtures";
+
+describe("JSON-LD FlightReservation", () => {
+  it("提取航段：墙上时间、座位、舱位、订座号、取消状态", () => {
+    const [a, b] = segmentsFromJsonLd(JSONLD_HTML);
+    expect(a).toEqual({
+      airline: "UA",
+      flightNumber: "110",
+      depAirport: "SFO",
+      arrAirport: "JFK",
+      depDate: "2027-03-04",
+      depTime: "20:15",
+      arrDate: "2027-03-05",
+      arrTime: "06:30",
+      confirmationCode: "RXJ34P",
+      seat: "9a",
+      cabin: "business",
+      cancelled: false,
+    });
+    // 航司写在航班号里、没有单独的 airline 对象
+    expect(b).toMatchObject({ airline: "UA", flightNumber: "111", cancelled: true, arrTime: null });
+  });
+
+  it("没有结构化数据时返回空", () => {
+    expect(segmentsFromJsonLd("<p>hello</p>")).toEqual([]);
+    expect(segmentsFromJsonLd('<script type="application/ld+json">{bad json</script>')).toEqual([]);
+  });
+});
+
+describe("工具函数", () => {
+  it("HTML 转纯文本保留段落与表格结构", () => {
+    const text = htmlToText(
+      "<style>p{}</style><p>航班&nbsp;MU5101</p><table><tr><td>PVG</td><td>PEK</td></tr></table><!-- x -->",
+    );
+    expect(text).toBe("航班 MU5101\nPVG PEK");
+  });
+
+  it("航班号拆分：航司码至少含一个字母", () => {
+    expect(splitFlightNumber("UA110", null)).toEqual({ airline: "UA", number: "110" });
+    expect(splitFlightNumber("110", "UA")).toEqual({ airline: "UA", number: "110" });
+    expect(splitFlightNumber("3U 8888", null)).toEqual({ airline: "3U", number: "8888" });
+    expect(splitFlightNumber("B6 1234", null)).toEqual({ airline: "B6", number: "1234" });
+    expect(splitFlightNumber("hello", null)).toBeNull();
+  });
+
+  it("舱位名称归类", () => {
+    expect(cabinFromName("Premium Economy")).toBe("premium");
+    expect(cabinFromName("公务舱")).toBe("business");
+    expect(cabinFromName("Coach")).toBe("economy");
+    expect(cabinFromName(undefined)).toBeNull();
+  });
+
+  it("地址规范化去掉 +标签和显示名", () => {
+    expect(normalizeAddress("Eva <Eva.Green+caf_=f-x=in.example.com@Gmail.com>")).toBe("eva.green@gmail.com");
+  });
+});
+
+describe("发件人校验", () => {
+  const allowed = ["eva@gmail.com"];
+  const ar = (s: string) => [`mx.cloudflare.net; ${s}`];
+
+  it("手动转发：信头 From 是本人且 DMARC 通过", () => {
+    expect(
+      checkSender({
+        envelopeFrom: "eva@gmail.com",
+        headerFrom: "eva@gmail.com",
+        authResults: ar(
+          "dkim=pass header.d=gmail.com; spf=pass smtp.mailfrom=eva@gmail.com; dmarc=pass header.from=gmail.com",
+        ),
+        allowed,
+      }),
+    ).toEqual({ ok: true, via: "header" });
+  });
+
+  it("自动转发：信头是航司，信封是本人（带 +caf_ 标签）且 SPF 通过", () => {
+    expect(
+      checkSender({
+        envelopeFrom: "eva+caf_=f-abc=in.example.com@gmail.com",
+        headerFrom: "noreply@united.com",
+        authResults: ar(
+          "spf=pass smtp.mailfrom=eva+caf_=f-abc=in.example.com@gmail.com; dmarc=pass header.from=united.com",
+        ),
+        allowed,
+      }),
+    ).toEqual({ ok: true, via: "envelope" });
+  });
+
+  it("伪造：自己域名的 DMARC 通过，但冒用本人的信封地址", () => {
+    const v = checkSender({
+      envelopeFrom: "eva@gmail.com",
+      headerFrom: "attacker@evil.example",
+      authResults: ar("spf=pass smtp.mailfrom=bounce@evil.example; dmarc=pass header.from=evil.example"),
+      allowed,
+    });
+    expect(v.ok).toBe(false);
+  });
+
+  it("伪造：信头冒用本人但验证不通过", () => {
+    const v = checkSender({
+      envelopeFrom: "x@evil.example",
+      headerFrom: "eva@gmail.com",
+      authResults: ar("dkim=none; spf=fail smtp.mailfrom=x@evil.example; dmarc=fail header.from=gmail.com"),
+      allowed,
+    });
+    expect(v).toMatchObject({ ok: false, reason: expect.stringContaining("验证") });
+  });
+
+  it("陌生发件人", () => {
+    const v = checkSender({
+      envelopeFrom: "bob@gmail.com",
+      headerFrom: "bob@gmail.com",
+      authResults: ar("dmarc=pass header.from=gmail.com"),
+      allowed,
+    });
+    expect(v).toMatchObject({ ok: false, reason: expect.stringContaining("不在") });
+  });
+});

@@ -14,11 +14,17 @@ const timestamps = {
  * 用户：id 是 Cloudflare Access 登录凭证里稳定的 sub，换邮箱也不变。
  * 第一次带着有效凭证访问 API 时自动创建。
  */
-export const users = sqliteTable("users", {
-  id: text("id").primaryKey(),
-  email: text("email").notNull(),
-  createdAt: timestamps.createdAt,
-});
+export const users = sqliteTable(
+  "users",
+  {
+    id: text("id").primaryKey(),
+    email: text("email").notNull(),
+    /** 邮件导入收件地址的本地部分（如 f-8k2x9q7m3a），每人一个，可重新生成 */
+    inboxToken: text("inbox_token"),
+    createdAt: timestamps.createdAt,
+  },
+  (t) => [uniqueIndex("users_inbox_token").on(t.inboxToken)],
+);
 
 /**
  * 多用户迁移之前的数据归属的占位用户；第一个登录的用户会认领这些数据。
@@ -67,22 +73,31 @@ export const flights = sqliteTable(
   ],
 );
 
-/** 收到的转发邮件（M4 使用）。 */
-export const emails = sqliteTable("emails", {
-  id: text("id").primaryKey(),
-  /** 按发件人匹配到的用户；匹配不到时为空 */
-  userId: text("user_id"),
-  receivedAt: text("received_at").notNull(),
-  fromAddr: text("from_addr"),
-  subject: text("subject"),
-  r2Key: text("r2_key"),
-  parseStatus: text("parse_status", { enum: ["pending", "parsed", "failed", "ignored"] })
-    .notNull()
-    .default("pending"),
-  parseMethod: text("parse_method", { enum: ["jsonld", "llm"] }),
-  error: text("error"),
-  flightCount: integer("flight_count").notNull().default(0),
-});
+/**
+ * 收到的转发邮件。按收件地址匹配到用户；认不出收件人的邮件直接丢弃、不入库。
+ * 正文（HTML 和纯文本）存下来，解析逻辑改进后可以重新解析。
+ */
+export const emails = sqliteTable(
+  "emails",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id"),
+    receivedAt: text("received_at").notNull(),
+    fromAddr: text("from_addr"),
+    toAddr: text("to_addr"),
+    subject: text("subject"),
+    r2Key: text("r2_key"),
+    bodyHtml: text("body_html"),
+    bodyText: text("body_text"),
+    parseStatus: text("parse_status", { enum: ["pending", "parsed", "failed", "ignored"] })
+      .notNull()
+      .default("pending"),
+    parseMethod: text("parse_method", { enum: ["jsonld", "llm"] }),
+    error: text("error"),
+    flightCount: integer("flight_count").notNull().default(0),
+  },
+  (t) => [index("emails_user_received").on(t.userId, t.receivedAt)],
+);
 
 /** 外部查询缓存（M3 使用），key 如 UA857:2024-05-01。 */
 export const lookupCache = sqliteTable("lookup_cache", {

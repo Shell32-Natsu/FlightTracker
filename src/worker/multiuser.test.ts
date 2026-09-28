@@ -3,32 +3,11 @@
  * 依次执行 migrations/ 里真实的迁移文件，再通过 Worker 的 fetch 入口发请求。
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { getPlatformProxy } from "wrangler";
-import worker from "./index";
-import { resetUserCache } from "./users";
-import m0000 from "../../migrations/0000_init.sql?raw";
-import m0001 from "../../migrations/0001_settings.sql?raw";
-import m0002 from "../../migrations/0002_multi_user.sql?raw";
+import { apiAs, migrate, MIGRATIONS, startDb } from "./testing";
 
-type Proxy = Awaited<ReturnType<typeof getPlatformProxy<{ DB: D1Database }>>>;
-let proxy: Proxy;
-let env: { DB: D1Database; DEV_SKIP_AUTH: string };
-
-async function migrate(db: D1Database, sql: string) {
-  const stmts = sql
-    .split("--> statement-breakpoint")
-    .map((s) => s.replace(/^\s*--.*$/gm, "").trim())
-    .filter(Boolean);
-  await db.batch(stmts.map((s) => db.prepare(s)));
-}
-
-function api(user: string, path: string, init: RequestInit = {}) {
-  const req = new Request(`http://localhost/api${path}`, {
-    ...init,
-    headers: { "Content-Type": "application/json", "X-Dev-User": user, ...init.headers },
-  });
-  return worker.fetch(req as never, env as never, {} as never);
-}
+let proxy: Awaited<ReturnType<typeof startDb>>;
+let env: { DB: D1Database };
+let api: ReturnType<typeof apiAs>;
 
 const flight = {
   flightDate: "2025-03-01",
@@ -41,13 +20,13 @@ const flight = {
 };
 
 beforeAll(async () => {
-  proxy = await getPlatformProxy<{ DB: D1Database }>({ configPath: "wrangler.jsonc", persist: false });
-  env = { DB: proxy.env.DB, DEV_SKIP_AUTH: "true" };
-  resetUserCache();
+  proxy = await startDb();
+  env = { DB: proxy.env.DB };
+  api = apiAs(env);
   const db = env.DB;
   // 单用户时代的库，带一条航班和一项设置
-  await migrate(db, m0000);
-  await migrate(db, m0001);
+  await migrate(db, MIGRATIONS[0]);
+  await migrate(db, MIGRATIONS[1]);
   await db
     .prepare(
       "INSERT INTO flights (id, status, source, flight_date, airline, flight_number, dep_airport, arr_airport) VALUES ('old1','confirmed','csv','2024-05-01','CA','1501','PEK','SHA')",
@@ -58,7 +37,8 @@ beforeAll(async () => {
       "INSERT INTO settings (key, value, updated_at) VALUES ('homeAirport', '\"PEK\"', '2024-01-01T00:00:00Z')",
     )
     .run();
-  await migrate(db, m0002);
+  await migrate(db, MIGRATIONS[2]);
+  await migrate(db, MIGRATIONS[3]);
 }, 60_000);
 
 afterAll(async () => {
