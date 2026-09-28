@@ -29,6 +29,13 @@ export function PosterPage() {
   const [year, setYear] = useState<number | null>(params.get("year") ? Number(params.get("year")) : null);
   const [scope, setScope] = useState<number | "all">("all");
   const [flightId, setFlightId] = useState<string | null>(params.get("flight"));
+  const [holder, setHolder] = useState(() => {
+    try {
+      return localStorage.getItem("poster-holder") ?? "";
+    } catch {
+      return "";
+    }
+  });
   const [rotation, setRotation] = useState<[number, number] | null>(null);
   const [status, setStatus] = useState<{ kind: "busy" | "done" | "error"; text: string } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -46,12 +53,12 @@ export function PosterPage() {
 
   const palette = PALETTES[paletteId];
   const effectiveColorBy: ColorBy =
-    template === "card" ? "single" : template === "year" && colorBy === "year" ? "single" : colorBy;
+    template === "card" || template === "passport" ? "single" : template === "year" && colorBy === "year" ? "single" : colorBy;
 
   const selected = useMemo(() => {
     if (template === "year") return all.filter((f) => flightYear(f) === activeYear);
     if (template === "card") return flight ? [flight] : [];
-    if (template === "wallpaper" && scope !== "all") return all.filter((f) => flightYear(f) === scope);
+    if ((template === "wallpaper" || template === "passport") && scope !== "all") return all.filter((f) => flightYear(f) === scope);
     return all;
   }, [template, all, activeYear, flight, scope]);
 
@@ -166,7 +173,7 @@ export function PosterPage() {
             </div>
           )}
 
-          {template === "wallpaper" && (
+          {(template === "wallpaper" || template === "passport") && (
             <div className="control-group">
               <span className="control-label">范围</span>
               <div className="chips wrap">
@@ -203,7 +210,31 @@ export function PosterPage() {
             </div>
           )}
 
-          {template !== "card" && (
+          {template === "passport" && (
+            <div className="control-group">
+              <label className="control-label" htmlFor="poster-holder">
+                持有人（英文名，印在机读区）
+              </label>
+              <input
+                id="poster-holder"
+                className="input"
+                placeholder="如 Donny Xia"
+                value={holder}
+                maxLength={32}
+                autoComplete="off"
+                onChange={(e) => {
+                  setHolder(e.target.value);
+                  try {
+                    localStorage.setItem("poster-holder", e.target.value);
+                  } catch {
+                    /* 隐私模式 */
+                  }
+                }}
+              />
+            </div>
+          )}
+
+          {template !== "card" && template !== "passport" && (
             <div className="control-group">
               <span className="control-label">航线颜色</span>
               <Segmented
@@ -264,6 +295,7 @@ export function PosterPage() {
               year={template === "year" ? activeYear : scope === "all" ? undefined : scope}
               flight={flight}
               rotation={rotation ?? undefined}
+              holder={holder}
             />
           </div>
           {template === "wallpaper" && (

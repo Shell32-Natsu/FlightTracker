@@ -12,8 +12,9 @@ import type { PosterData } from "./data";
 import { geoDistance } from "d3-geo";
 import { PosterMap, routeCenter } from "./PosterMap";
 import { FONT } from "./text";
+import { PassportPoster } from "./passport";
 
-export type TemplateId = "year" | "overview" | "card" | "wallpaper";
+export type TemplateId = "year" | "overview" | "card" | "wallpaper" | "passport";
 
 export interface TemplateSpec {
   id: TemplateId;
@@ -29,6 +30,7 @@ export const TEMPLATES: Record<TemplateId, TemplateSpec> = {
   overview: { id: "overview", name: "生涯总览", ratio: "16:9", width: 1600, height: 900 },
   card: { id: "card", name: "航班卡片", ratio: "1:1", width: 900, height: 900 },
   wallpaper: { id: "wallpaper", name: "手机壁纸", ratio: "9:19.5", width: 600, height: 1300 },
+  passport: { id: "passport", name: "飞行护照", ratio: "3:4", width: 900, height: 1200 },
 };
 
 export interface TemplateProps {
@@ -41,6 +43,8 @@ export interface TemplateProps {
   flight?: Flight;
   /** 壁纸地球的视角中心 */
   rotation?: [number, number];
+  /** 护照上的持有人姓名（机读区） */
+  holder?: string;
 }
 
 const num = (n: number) => Math.round(n).toLocaleString("en-US");
@@ -448,4 +452,5 @@ export const TEMPLATE_COMPONENTS = {
   overview: OverviewPoster,
   card: FlightCard,
   wallpaper: Wallpaper,
+  passport: PassportPoster,
 } as const;
