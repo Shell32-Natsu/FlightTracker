@@ -83,9 +83,22 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
 /** "8:05" / "08:05:00" / "0805" → "08:05"；认不出返回 null。 */
 export function normalizeTime(v: string | null): string | null {
   if (!v) return null;
-  const m = /^(\d{1,2}):?(\d{2})(?::\d{2})?$/.exec(v.trim());
-  if (!m || +m[1] > 23 || +m[2] > 59) return null;
-  return `${m[1].padStart(2, "0")}:${m[2]}`;
+  const s = v.trim().toLowerCase().replace(/\s+/g, " ");
+  // 12 小时制：5:25 PM / 10:05am / 下午 5:25 / 晚上9点30
+  const m =
+    /^(上午|早上|凌晨|中午|下午|晚上)?\s*(\d{1,2})(?:[:：点.h]?(\d{2}))?(?::\d{2})?\s*(a\.?m\.?|p\.?m\.?)?(?:\s*\([^)]*\))?$/.exec(
+      s,
+    );
+  if (!m || (!m[3] && !m[1] && !m[4])) return null;
+  let h = +m[2];
+  const min = m[3] ? +m[3] : 0;
+  const pm = (m[4] && m[4].startsWith("p")) || (m[1] && /下午|晚上/.test(m[1]) && h < 12);
+  const am = (m[4] && m[4].startsWith("a")) || (m[1] && /上午|早上|凌晨/.test(m[1]));
+  if (m[4] && (h < 1 || h > 12)) return null;
+  if (pm && h < 12) h += 12;
+  if (am && h === 12) h = 0;
+  if (h > 23 || min > 59) return null;
+  return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
 }
 
 /**
@@ -115,6 +128,14 @@ export function toSegments(output: unknown): ExtractedSegment[] {
       arrAirport: arr,
       depDate,
       depTime: normalizeTime(s.departure_time),
+      notes: [
+        ...(s.departure_time && !normalizeTime(s.departure_time)
+          ? [`起飞时间“${s.departure_time}”格式认不出，已留空`]
+          : []),
+        ...(s.arrival_time && !normalizeTime(s.arrival_time)
+          ? [`到达时间“${s.arrival_time}”格式认不出，已留空`]
+          : []),
+      ],
       arrDate: s.arrival_date && DATE.test(s.arrival_date) ? s.arrival_date : null,
       arrTime: normalizeTime(s.arrival_time),
       confirmationCode: s.confirmation_code?.toUpperCase() ?? null,

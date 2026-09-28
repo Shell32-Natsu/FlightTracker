@@ -180,7 +180,6 @@ export function llmExtractor(
 }
 
 /** 航段 → 航班表需要的字段（当地时间按机场时区换成 UTC）。 */
-const NOTE_ARRIVAL_DROPPED = "邮件里的到达时间和起飞时间对不上，已留空，请核对";
 
 /**
  * 到达时间（UTC）。邮件和模型给的到达日期经常不可靠（跨日、跨日期变更线，如 NRT→LAX 当天早上到），
@@ -234,7 +233,18 @@ function toFlightFields(seg: ExtractedSegment) {
     seat: seg.seat,
     cabin: seg.cabin,
     confirmationCode: seg.confirmationCode,
-    notes: seg.arrTime && !arrUtc ? NOTE_ARRIVAL_DROPPED : null,
+    notes:
+      [
+        ...(seg.notes ?? []),
+        ...(seg.arrTime && !arrUtc
+          ? [
+              `识别到的到达时间 ${seg.arrDate ?? ""} ${seg.arrTime} 和起飞时间 ${seg.depDate} ${seg.depTime ?? "?"} 按航程距离对不上，已留空，请核对`.replace(
+                "  ",
+                " ",
+              ),
+            ]
+          : []),
+      ].join("\n") || null,
   };
 }
 

@@ -301,6 +301,27 @@ describe("正文识别（LLM）", () => {
     expect(sq).toMatchObject({ schedDepUtc: "2026-10-20T08:25:00Z", schedArrUtc: "2026-10-20T17:05:00Z" });
   });
 
+  it("到达时间按距离不可能时留空，并在备注里写明识别到的值", async () => {
+    // 上海→北京 2 小时的航程，“07:30 到达”在任何一天都对不上
+    await deliver(
+      aliceInbox,
+      mime({ from: "alice@gmail.com", to: aliceInbox, subject: "bad arrival", text: "x", auth: PASS }),
+      "alice@gmail.com",
+      stub([
+        seg({
+          flightNumber: "5155",
+          depDate: "2026-11-05",
+          depTime: "08:00",
+          arrDate: null,
+          arrTime: "07:30",
+        }),
+      ]),
+    );
+    const f = (await pending()).find((x) => x.flightNumber === "5155");
+    expect(f?.schedArrUtc).toBeNull();
+    expect(f?.notes).toContain("07:30");
+  });
+
   it("机场三字码不对：整封失败，不写入任何航段", async () => {
     const before = (await pending()).length;
     const r = await deliver(

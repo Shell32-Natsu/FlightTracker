@@ -20,6 +20,8 @@ export interface ExtractedSegment {
   cabin: Cabin | null;
   /** 邮件说这一段已取消 */
   cancelled: boolean;
+  /** 识别过程中的提示（如时间格式认不出），写进航班备注 */
+  notes?: string[];
 }
 
 /** 舱位名称（各种写法）→ 四个舱位之一。 */

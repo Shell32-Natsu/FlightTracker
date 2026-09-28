@@ -50,6 +50,7 @@ describe("Workers AI 识别", () => {
         seat: "31A",
         cabin: "economy",
         cancelled: false,
+        notes: [],
       },
     ]);
   });
@@ -85,6 +86,8 @@ describe("结果整理", () => {
     });
     expect(segs).toHaveLength(1);
     expect(segs[0]).toMatchObject({ depTime: null, cabin: null, cancelled: true });
+    // 认不出的时间写进备注，方便核对
+    expect(segs[0].notes).toEqual(["起飞时间“早上”格式认不出，已留空"]);
   });
 
   it("时间格式", () => {
@@ -92,6 +95,16 @@ describe("结果整理", () => {
     expect(normalizeTime("0805")).toBe("08:05");
     expect(normalizeTime("23:59:00")).toBe("23:59");
     expect(normalizeTime("25:00")).toBeNull();
+    // 12 小时制和中文写法
+    expect(normalizeTime("5:25 PM")).toBe("17:25");
+    expect(normalizeTime("10:05am")).toBe("10:05");
+    expect(normalizeTime("12:30 A.M.")).toBe("00:30");
+    expect(normalizeTime("12:10 pm")).toBe("12:10");
+    expect(normalizeTime("下午 5:25")).toBe("17:25");
+    expect(normalizeTime("晚上9点30")).toBe("21:30");
+    expect(normalizeTime("10:05 (+1)")).toBe("10:05");
+    expect(normalizeTime("8")).toBeNull();
+    expect(normalizeTime("13:00 PM")).toBeNull();
   });
 
   it("token 估算：中文按字、其余按 4 字符", () => {
