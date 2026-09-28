@@ -1398,7 +1398,8 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 
 .ticket-grid {
   display: grid;
-  grid-template-columns: 1fr;
+  /* minmax(0, …)：不让卡片里的长文字把列撑得比屏幕还宽 */
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
 }
 
@@ -3840,8 +3841,12 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 .ticket-source-text {
   min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  /* 邮件标题常常很长：最多两行 */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 
 .email-status {
