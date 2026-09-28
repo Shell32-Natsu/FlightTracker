@@ -60,3 +60,16 @@ export const DEMO_PENDING: [string, string, string, string, string, string, stri
   ["2026-10-18", "CX365", "PVG", "HKG", "08:30", "A359", "K7Q2ZP"],
   ["2026-10-24", "CX364", "HKG", "PVG", "18:15", "A359", "K7Q2ZP"],
 ];
+
+/** 部分航班的飞机注册号（虚构），键为 “日期 航班号”。 */
+export const DEMO_REGISTRATIONS: Record<string, string> = {
+  "2023-04-02 UA858": "N2749U",
+  "2023-04-14 UA857": "N2352U",
+  "2025-07-06 UA857": "N2749U",
+  "2023-08-11 JL872": "JA838J",
+  "2023-08-19 JL873": "JA841J",
+  "2026-01-09 JL874": "JA838J",
+  "2026-01-12 JL877": "JA830J",
+  "2024-03-28 SQ833": "9V-SMF",
+  "2024-04-13 SQ830": "9V-SHA",
+};

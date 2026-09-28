@@ -13,7 +13,7 @@ import type {
 import { DEFAULT_SETTINGS, SETTING_KEYS, type Settings } from "../../shared/settings";
 import { assetUrl } from "./env";
 import { dedupeKey, flightsToCsv } from "../../shared/flightCsv";
-import { DEMO_FLIGHTS, DEMO_PENDING } from "./demoData";
+import { DEMO_FLIGHTS, DEMO_PENDING, DEMO_REGISTRATIONS } from "./demoData";
 
 /**
  * 演示模式下的 /api 模拟：数据放在内存里，刷新页面恢复初始状态。
@@ -38,6 +38,7 @@ const demoEmails: EmailRecord[] = [
     parseMethod: "jsonld",
     error: null,
     flightCount: 2,
+    pendingCount: 2,
   },
   {
     id: "demo-email-2",
@@ -48,6 +49,7 @@ const demoEmails: EmailRecord[] = [
     parseMethod: "llm",
     error: "邮件里没有找到航班行程",
     flightCount: 0,
+    pendingCount: 0,
   },
   {
     id: "demo-email-3",
@@ -58,6 +60,7 @@ const demoEmails: EmailRecord[] = [
     parseMethod: null,
     error: "发件人 someone@unknown.example 不在你允许的发件地址里",
     flightCount: 0,
+    pendingCount: 0,
   },
 ];
 
@@ -126,6 +129,7 @@ async function ready(): Promise<Flight[]> {
         ...seed(date, code, dep, arr, time),
         source: "manual",
         aircraftType: aircraft,
+        registration: DEMO_REGISTRATIONS[`${date} ${code}`] ?? null,
         cabin: cabin as Cabin,
         seat,
         purpose: purpose as Purpose,
@@ -178,6 +182,29 @@ export async function demoFetch(path: string, init: RequestInit): Promise<Respon
   const parts = url.pathname.split("/").filter(Boolean); // ["flights", id?, "confirm"?]
   const body = init.body ? (JSON.parse(String(init.body)) as FlightInput) : null;
 
+  if (parts[0] === "aircraft-info" && parts[1]) {
+    // 演示版没有后端：浏览器直接请求维基百科（它允许跨域）
+    const { aircraftFamily } = await import("../../shared/aircraft");
+    const family = aircraftFamily(parts[1]);
+    if (!family) return json({ error: "暂无这个机型的介绍" }, 404);
+    for (const lang of ["zh", "en"] as const) {
+      const res = await fetch(
+        `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(family.wiki[lang])}`,
+        { headers: { "Accept-Language": lang === "zh" ? "zh-cn" : "en" } },
+      ).catch(() => null);
+      if (!res?.ok) continue;
+      const j = await res.json();
+      if (j.type === "disambiguation" || !j.extract) continue;
+      return json({
+        lang,
+        title: j.title,
+        extract: j.extract,
+        url: j.content_urls?.desktop?.page,
+        thumbnail: j.thumbnail?.source ?? null,
+      });
+    }
+    return json({ error: "暂时取不到机型介绍" }, 502);
+  }
   if (parts[0] === "settings") {
     if (method === "PUT" && init.body) {
       const patch = JSON.parse(String(init.body)) as Partial<Settings>;
@@ -206,11 +233,15 @@ export async function demoFetch(path: string, init: RequestInit): Promise<Respon
     return json(info);
   }
   if (parts[0] === "emails") {
+    const withPending = (e: EmailRecord) => ({
+      ...e,
+      pendingCount: flights.filter((f) => f.emailId === e.id && f.status === "pending").length,
+    });
     if (parts[2] === "reparse" && method === "POST") {
       const e = demoEmails.find((x) => x.id === parts[1]);
-      return e ? json(e) : json({ error: "邮件不存在" }, 404);
+      return e ? json(withPending(e)) : json({ error: "邮件不存在" }, 404);
     }
-    return json(demoEmails);
+    return json(demoEmails.map(withPending));
   }
   if (parts[0] === "import" && method === "POST" && init.body) {
     const items = (JSON.parse(String(init.body)) as { flights: FlightInput[] }).flights;

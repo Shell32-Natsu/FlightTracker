@@ -15,6 +15,7 @@ const MapPage = lazy(() => import("./pages/MapPage").then((m) => ({ default: m.M
 const StatsPage = lazy(() => import("./pages/StatsPage").then((m) => ({ default: m.StatsPage })));
 // 海报页带着中文字体和导出逻辑，单独按需加载
 const PosterPage = lazy(() => import("./pages/PosterPage").then((m) => ({ default: m.PosterPage })));
+const AircraftPage = lazy(() => import("./pages/AircraftPage").then((m) => ({ default: m.AircraftPage })));
 const AnimationPage = lazy(() => import("./pages/AnimationPage").then((m) => ({ default: m.AnimationPage })));
 
 export function App() {
@@ -53,6 +54,7 @@ export function App() {
             <Route path="/add" element={<AddFlightPage />} />
             <Route path="/pending" element={<PendingPage />} />
             <Route path="/stats" element={<StatsPage />} />
+            <Route path="/aircraft/:type" element={<AircraftPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/import" element={<ImportPage />} />
             <Route path="/poster" element={<PosterPage />} />

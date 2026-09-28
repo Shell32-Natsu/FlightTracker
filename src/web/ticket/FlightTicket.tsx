@@ -16,7 +16,7 @@ import {
   localTimes,
   type DistanceUnit,
 } from "../lib/format";
-import { AirlineBadge } from "../ui/AirlineBadge";
+import { AirlineLogo } from "../ui/AirlineBadge";
 
 export interface TicketData {
   airline: string;
@@ -91,7 +91,7 @@ export function FlightTicket({ data: d, refData, unit = "km", to, compact, foote
     <>
       <div className="ticket-head">
         {d.airline ? (
-          <AirlineBadge code={d.airline} size={compact ? "sm" : "md"} />
+          <AirlineLogo code={d.airline} size={compact ? "sm" : "md"} />
         ) : (
           <span className={`airline-badge placeholder ${compact ? "sm" : "md"}`} aria-hidden />
         )}

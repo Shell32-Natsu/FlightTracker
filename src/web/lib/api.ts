@@ -142,6 +142,25 @@ export async function downloadExportCsv(): Promise<void> {
 }
 
 /** 邮件导入：专属收件地址和允许的发件人。 */
+export interface AircraftInfo {
+  lang: "zh" | "en";
+  title: string;
+  extract: string;
+  url: string;
+  thumbnail: string | null;
+}
+
+/** 机型的维基百科简介（Worker 代理并缓存） */
+export function useAircraftInfo(type: string | undefined) {
+  return useQuery({
+    queryKey: ["aircraft-info", type],
+    queryFn: () => request<AircraftInfo>(`/aircraft-info/${encodeURIComponent(type!)}`),
+    enabled: !!type,
+    staleTime: Infinity,
+    retry: false,
+  });
+}
+
 export function useInbox() {
   return useQuery({ queryKey: ["inbox"], queryFn: () => request<InboxInfo>("/inbox") });
 }

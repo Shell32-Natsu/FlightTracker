@@ -5,7 +5,7 @@ import { useFlights, useImportFlights, type ImportResult } from "../lib/api";
 import { useRefData } from "../lib/refdata";
 import { importContext } from "../lib/importContext";
 import { dedupeKey, parseFlightCsv, type ImportRow, type ParsedImport } from "../../shared/flightCsv";
-import { AirlineBadge } from "../ui/AirlineBadge";
+import { AirlineLogo } from "../ui/AirlineBadge";
 import { flightDurationMin } from "../../shared/derive";
 import { formatDuration } from "../../shared/time";
 import { ErrorBox, Loading } from "../components/Status";
@@ -194,7 +194,7 @@ export function ImportPage() {
                       <span className="ir-code-m"> · {r.label.split(" ")[1]}</span>
                     </span>
                     <span className="ir-flight">
-                      {r.input ? <AirlineBadge code={r.input.airline} size="sm" /> : null}
+                      {r.input ? <AirlineLogo code={r.input.airline} size="sm" /> : null}
                       <b>{r.input ? `${r.input.airline}${r.input.flightNumber}` : r.label.split(" ")[1]}</b>
                     </span>
                     <span className="ir-route">

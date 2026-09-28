@@ -36,14 +36,17 @@ import type { Flight } from "../../shared/types";
 import { ColumnChart, type Column } from "../charts/ColumnChart";
 import { MonthHeatmap } from "../charts/MonthHeatmap";
 import { FlightTicket, ticketFromFlight } from "../ticket/FlightTicket";
+import { AircraftProfile } from "../aircraft/AircraftProfile";
+import { aircraftUsage } from "../aircraft/usage";
 import { YearFilter } from "../ui/YearFilter";
 import { Segmented } from "../ui/Segmented";
-import { AirlineBadge } from "../ui/AirlineBadge";
+import { AirlineLogo } from "../ui/AirlineBadge";
 import { Flag } from "../ui/Flag";
 import { Empty, ErrorBox, Loading } from "../components/Status";
 import {
   CABIN_LABEL,
   aircraftName,
+  formatHours,
   airlineName,
   cityName,
   countryName,
@@ -264,6 +267,8 @@ function StatsBody({
           <MonthHeatmap years={matrix.years} counts={matrix.counts} max={matrix.max} />
         </section>
 
+        <Hangar flights={flights} refData={refData} />
+
         <RankCard
           title="常飞航线"
           items={stats.routes}
@@ -285,7 +290,7 @@ function StatsBody({
           title="航司"
           items={stats.airlines}
           leadWidth={26}
-          lead={(k) => <AirlineBadge code={k} size="sm" />}
+          lead={(k) => <AirlineLogo code={k} size="sm" />}
           label={(k) => airlineName(k, refData)}
         />
         <RankCard
@@ -294,6 +299,7 @@ function StatsBody({
           leadWidth={44}
           lead={(k) => <span className="iata-chip">{k}</span>}
           label={(k) => aircraftName(k, refData)}
+          to={(k) => `/aircraft/${k}`}
         />
 
         <section className="card">
@@ -403,18 +409,51 @@ function StatsBody({
                 <div className="record-label">
                   <Plane size={13} /> 坐得最多的机型
                 </div>
-                <div className="record-card">
+                <Link to={`/aircraft/${stats.aircraft[0].key}`} className="record-card">
                   <b>{aircraftName(stats.aircraft[0].key, refData)}</b>
                   <span>
                     {stats.aircraft[0].count} 次 · {stats.aircraft[0].key}
                   </span>
-                </div>
+                </Link>
               </div>
             )}
           </div>
         </section>
       </div>
     </>
+  );
+}
+
+/** 机库：坐得最多的三个机型，带各自最常坐的航司涂装。 */
+function Hangar({ flights, refData }: { flights: Flight[]; refData: RefData }) {
+  const top = useMemo(() => aircraftUsage(flights).slice(0, 3), [flights]);
+  if (top.length === 0) return null;
+  const typeCount = new Set(flights.map((f) => f.aircraftType).filter(Boolean)).size;
+  const short = (t: string) => aircraftName(t, refData).replace(/^(Boeing|Airbus) /, "");
+  return (
+    <section className="card wide hangar">
+      <div className="card-head">
+        <h2 className="section-title">
+          机库 <span className="count">{typeCount} 种机型</span>
+        </h2>
+      </div>
+      <ol className="hangar-list">
+        {top.map((u, i) => (
+          <li key={u.type} className={i === 0 ? "lead" : ""}>
+            <Link to={`/aircraft/${u.type}`}>
+              <span className="hangar-text">
+                {i === 0 && <small>坐得最多</small>}
+                <b>{short(u.type)}</b>
+                <span>
+                  {u.flights.length} 次{u.minutes > 0 && ` · ${formatHours(u.minutes)}`}
+                </span>
+              </span>
+              <AircraftProfile type={u.type} airline={u.airlines[0]?.code} refData={refData} className="hangar-art" />
+            </Link>
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }
 
@@ -581,9 +620,12 @@ function RankCard({
   lead,
   leadWidth,
   label,
+  to,
 }: {
   title: string;
   items: Ranked[];
+  /** 行可点击时的目标地址 */
+  to?: (key: string) => string;
   lead: (key: string) => React.ReactNode;
   /** 前导标记列的固定宽度，保证各行名称对齐 */
   leadWidth: number;
@@ -606,7 +648,13 @@ function RankCard({
             <span className="rank-no">{i + 1}</span>
             <span className="rank-lead">{lead(r.key)}</span>
             <span className="rank-main">
-              <span className="rank-name">{label(r.key)}</span>
+              {to ? (
+                <Link to={to(r.key)} className="rank-name rank-link">
+                  {label(r.key)}
+                </Link>
+              ) : (
+                <span className="rank-name">{label(r.key)}</span>
+              )}
               <span className="rank-track">
                 <span
                   className="rank-fill"

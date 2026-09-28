@@ -4,6 +4,7 @@ import { flightRoutes } from "./routes/flights";
 import { settingsRoutes } from "./routes/settings";
 import { importExportRoutes } from "./routes/importExport";
 import { emailRoutes } from "./routes/emails";
+import { mediaRoutes } from "./routes/media";
 import { receiveEmail } from "./email/ingest";
 import type { AppEnv } from "./env";
 
@@ -13,7 +14,8 @@ const api = new Hono<AppEnv>()
   .route("/flights", flightRoutes)
   .route("/settings", settingsRoutes)
   .route("/", importExportRoutes)
-  .route("/", emailRoutes);
+  .route("/", emailRoutes)
+  .route("/", mediaRoutes);
 
 const app = new Hono<AppEnv>()
   .route("/api", api)

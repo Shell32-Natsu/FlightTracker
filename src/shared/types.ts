@@ -86,6 +86,8 @@ export interface EmailRecord {
   error: string | null;
   /** 新增或更新的航段数 */
   flightCount: number;
+  /** 其中还没确认的段数 */
+  pendingCount: number;
 }
 
 /** 当前用户的邮件导入配置。 */

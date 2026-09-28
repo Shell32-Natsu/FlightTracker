@@ -12,6 +12,7 @@ import type { PosterData } from "./data";
 import { geoDistance } from "d3-geo";
 import { PosterMap, routeCenter } from "./PosterMap";
 import { FONT } from "./text";
+import { useAirlineLogo } from "../lib/logos";
 import { PassportPoster } from "./passport";
 
 export type TemplateId = "year" | "overview" | "card" | "wallpaper" | "passport";
@@ -295,6 +296,8 @@ export const FlightCard = forwardRef<SVGSVGElement, TemplateProps>(function Flig
   ref,
 ) {
   const spec = TEMPLATES.card;
+  // 徽标用 data URL 嵌入，导出 PNG 时才画得出来
+  const logo = useAirlineLogo(flight?.airline);
   if (!flight) {
     return (
       <Canvas ref={ref} spec={spec} p={p}>
@@ -346,10 +349,19 @@ export const FlightCard = forwardRef<SVGSVGElement, TemplateProps>(function Flig
       <rect x={0} y={400} width={900} height={170} fill="url(#card-fade)" />
 
       <g transform="translate(56,56)">
-        <rect width={52} height={52} rx={14} fill={`hsl(${hue} 42% ${p.id === "night" ? 17 : 88}%)`} stroke={`hsl(${hue} 45% ${p.id === "night" ? 30 : 72}%)`} />
-        <text x={26} y={33} textAnchor="middle" fontSize={17} fontWeight={800} fill={`hsl(${hue} ${p.id === "night" ? "90% 80%" : "60% 30%"})`}>
-          {flight.airline}
-        </text>
+        {logo.data ? (
+          <>
+            <rect width={52} height={52} rx={14} fill="#f5f7fb" stroke={p.faint} strokeOpacity={0.3} />
+            <image href={logo.data.src} x={6} y={6} width={40} height={40} preserveAspectRatio="xMidYMid meet" />
+          </>
+        ) : (
+          <>
+            <rect width={52} height={52} rx={14} fill={`hsl(${hue} 42% ${p.id === "night" ? 17 : 88}%)`} stroke={`hsl(${hue} 45% ${p.id === "night" ? 30 : 72}%)`} />
+            <text x={26} y={33} textAnchor="middle" fontSize={17} fontWeight={800} fill={`hsl(${hue} ${p.id === "night" ? "90% 80%" : "60% 30%"})`}>
+              {flight.airline}
+            </text>
+          </>
+        )}
         <text x={68} y={24} fontSize={24} fontWeight={800} fill={p.text}>
           {flight.airline}
           {flight.flightNumber}
