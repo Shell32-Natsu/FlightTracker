@@ -9,4 +9,10 @@ export interface Env {
   DEV_SKIP_AUTH?: string;
 }
 
-export type AppEnv = { Bindings: Env; Variables: { userEmail: string } };
+export interface CurrentUser {
+  /** Access 凭证里的 sub，稳定的用户 ID */
+  id: string;
+  email: string;
+}
+
+export type AppEnv = { Bindings: Env; Variables: { user: CurrentUser } };

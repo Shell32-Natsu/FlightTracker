@@ -1,6 +1,7 @@
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { createMiddleware } from "hono/factory";
 import type { AppEnv } from "./env";
+import { ensureUser } from "./users";
 
 const jwksCache = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
 
@@ -14,12 +15,16 @@ function jwks(teamDomain: string) {
 }
 
 /**
- * 再校验一次 Cloudflare Access 签发的 JWT，防止绕过 Access 直接访问 Worker。
- * 本地开发时通过 DEV_SKIP_AUTH=true 跳过。
+ * 再校验一次 Cloudflare Access 签发的 JWT，防止绕过 Access 直接访问 Worker；
+ * 用凭证里的 sub 作为用户 ID，第一次访问时自动建用户。
+ * 本地开发时通过 DEV_SKIP_AUTH=true 跳过校验，可用 X-Dev-User 请求头模拟不同用户。
  */
 export const accessAuth = createMiddleware<AppEnv>(async (c, next) => {
   if (c.env.DEV_SKIP_AUTH === "true") {
-    c.set("userEmail", "dev@localhost");
+    const dev = c.req.header("X-Dev-User")?.trim() || "dev";
+    const user = { id: `dev:${dev}`, email: `${dev}@localhost` };
+    await ensureUser(c.env.DB, user.id, user.email);
+    c.set("user", user);
     return next();
   }
   const { ACCESS_TEAM_DOMAIN: team, ACCESS_AUD: aud } = c.env;
@@ -33,9 +38,12 @@ export const accessAuth = createMiddleware<AppEnv>(async (c, next) => {
       issuer: `https://${team}`,
       audience: aud,
     });
-    c.set("userEmail", String(payload.email ?? ""));
+    if (!payload.sub) throw new Error("凭证缺少 sub");
+    c.set("user", { id: payload.sub, email: String(payload.email ?? "") });
   } catch {
     return c.json({ error: "Access 凭证无效" }, 403);
   }
+  const user = c.get("user");
+  await ensureUser(c.env.DB, user.id, user.email);
   return next();
 });

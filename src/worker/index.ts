@@ -7,7 +7,7 @@ import type { AppEnv } from "./env";
 
 const api = new Hono<AppEnv>()
   .use("*", accessAuth)
-  .get("/me", (c) => c.json({ email: c.get("userEmail") }))
+  .get("/me", (c) => c.json({ email: c.get("user").email }))
   .route("/flights", flightRoutes)
   .route("/settings", settingsRoutes)
   .route("/", importExportRoutes);

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 const timestamps = {
   createdAt: text("created_at")
@@ -10,12 +10,31 @@ const timestamps = {
     .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
 };
 
+/**
+ * 用户：id 是 Cloudflare Access 登录凭证里稳定的 sub，换邮箱也不变。
+ * 第一次带着有效凭证访问 API 时自动创建。
+ */
+export const users = sqliteTable("users", {
+  id: text("id").primaryKey(),
+  email: text("email").notNull(),
+  createdAt: timestamps.createdAt,
+});
+
+/**
+ * 多用户迁移之前的数据归属的占位用户；第一个登录的用户会认领这些数据。
+ * 见 src/worker/users.ts。
+ */
+export const LEGACY_USER_ID = "legacy";
+
 /** 航班记录，每个航段一行。所有时间都是 UTC。 */
 export const flights = sqliteTable(
   "flights",
   {
     id: text("id").primaryKey(),
-    status: text("status", { enum: ["confirmed", "pending"] }).notNull().default("confirmed"),
+    userId: text("user_id").notNull(),
+    status: text("status", { enum: ["confirmed", "pending"] })
+      .notNull()
+      .default("confirmed"),
     source: text("source", { enum: ["manual", "lookup", "email", "csv"] }).notNull(),
     flightDate: text("flight_date").notNull(),
     airline: text("airline").notNull(),
@@ -41,15 +60,18 @@ export const flights = sqliteTable(
     ...timestamps,
   },
   (t) => [
-    uniqueIndex("flights_dedupe").on(t.airline, t.flightNumber, t.flightDate, t.depAirport),
-    index("flights_date").on(t.flightDate),
-    index("flights_status").on(t.status),
+    // 去重在同一用户内：两个人坐同一班飞机各记各的
+    uniqueIndex("flights_dedupe").on(t.userId, t.airline, t.flightNumber, t.flightDate, t.depAirport),
+    index("flights_user_date").on(t.userId, t.flightDate),
+    index("flights_user_status").on(t.userId, t.status),
   ],
 );
 
 /** 收到的转发邮件（M4 使用）。 */
 export const emails = sqliteTable("emails", {
   id: text("id").primaryKey(),
+  /** 按发件人匹配到的用户；匹配不到时为空 */
+  userId: text("user_id"),
   receivedAt: text("received_at").notNull(),
   fromAddr: text("from_addr"),
   subject: text("subject"),
@@ -69,9 +91,14 @@ export const lookupCache = sqliteTable("lookup_cache", {
   fetchedAt: text("fetched_at").notNull(),
 });
 
-/** 用户设置：每项一行，value 为 JSON（单用户应用，不需要用户列）。 */
-export const settings = sqliteTable("settings", {
-  key: text("key").primaryKey(),
-  value: text("value").notNull(),
-  updatedAt: text("updated_at").notNull(),
-});
+/** 用户设置：每人每项一行，value 为 JSON。 */
+export const settings = sqliteTable(
+  "settings",
+  {
+    userId: text("user_id").notNull(),
+    key: text("key").notNull(),
+    value: text("value").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.key] })],
+);

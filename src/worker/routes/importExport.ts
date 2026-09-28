@@ -1,12 +1,12 @@
 import { Hono } from "hono";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { z } from "zod";
 import { flights } from "../db/schema";
 import { findAirport } from "../airports";
 import { flightsToCsv } from "../../shared/flightCsv";
 import type { Flight } from "../../shared/types";
-import { flightInputSchema, withDerived } from "./flights";
+import { flightColumns, flightInputSchema, withDerived } from "./flights";
 import type { AppEnv } from "../env";
 
 /** 一次导入的上限，防止误传超大文件。 */
@@ -25,6 +25,7 @@ export const importExportRoutes = new Hono<AppEnv>()
       .safeParse(await c.req.json().catch(() => null));
     if (!body.success) return c.json({ error: `需要 1–${MAX_IMPORT} 条航班` }, 400);
 
+    const userId = c.get("user").id;
     const invalid: { index: number; message: string }[] = [];
     const now = new Date().toISOString();
     const rows = body.data.flights.flatMap((raw, index) => {
@@ -34,14 +35,25 @@ export const importExportRoutes = new Hono<AppEnv>()
         return [];
       }
       const { status, ...values } = withDerived(parsed.data);
-      return [{ ...values, id: crypto.randomUUID(), status: status ?? "confirmed", createdAt: now, updatedAt: now }];
+      return [
+        {
+          ...values,
+          id: crypto.randomUUID(),
+          userId,
+          status: status ?? "confirmed",
+          createdAt: now,
+          updatedAt: now,
+        },
+      ];
     });
 
     const db = drizzle(c.env.DB);
     let inserted = 0;
     for (let i = 0; i < rows.length; i += CHUNK) {
       const chunk = rows.slice(i, i + CHUNK);
-      const stmts = chunk.map((r) => db.insert(flights).values(r).onConflictDoNothing().returning({ id: flights.id }));
+      const stmts = chunk.map((r) =>
+        db.insert(flights).values(r).onConflictDoNothing().returning({ id: flights.id }),
+      );
       const results = await db.batch(stmts as [(typeof stmts)[0], ...typeof stmts]);
       inserted += results.reduce((n, r) => n + r.length, 0);
     }
@@ -50,8 +62,14 @@ export const importExportRoutes = new Hono<AppEnv>()
 
   /** 导出全部已确认航班（本应用格式，时间为机场当地时间）。 */
   .get("/export/csv", async (c) => {
-    const rows = await drizzle(c.env.DB).select().from(flights).where(eq(flights.status, "confirmed"));
-    const csv = flightsToCsv(rows as Flight[], new Proxy({}, { get: (_, code: string) => findAirport(code) }));
+    const rows = await drizzle(c.env.DB)
+      .select(flightColumns)
+      .from(flights)
+      .where(and(eq(flights.userId, c.get("user").id), eq(flights.status, "confirmed")));
+    const csv = flightsToCsv(
+      rows as Flight[],
+      new Proxy({}, { get: (_, code: string) => findAirport(code) }),
+    );
     const date = new Date().toISOString().slice(0, 10);
     return c.body(csv, 200, {
       "Content-Type": "text/csv; charset=utf-8",

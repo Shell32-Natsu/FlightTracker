@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, getTableColumns } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { z } from "zod";
 import { flights } from "../db/schema";
@@ -50,8 +50,14 @@ export const flightInputSchema = z
     aircraftType: optionalText.transform((v) => v?.toUpperCase() ?? null),
     registration: optionalText.transform((v) => v?.toUpperCase() ?? null),
     seat: optionalText.transform((v) => v?.toUpperCase() ?? null),
-    cabin: z.enum(CABINS).nullish().transform((v) => v ?? null),
-    purpose: z.enum(PURPOSES).nullish().transform((v) => v ?? null),
+    cabin: z
+      .enum(CABINS)
+      .nullish()
+      .transform((v) => v ?? null),
+    purpose: z
+      .enum(PURPOSES)
+      .nullish()
+      .transform((v) => v ?? null),
     confirmationCode: optionalText.transform((v) => v?.toUpperCase() ?? null),
     notes: optionalText,
   })
@@ -81,6 +87,10 @@ function isUniqueViolation(err: unknown): boolean {
   return msg.includes("UNIQUE constraint failed");
 }
 
+/** 返回给前端的列：不带 user_id。 */
+const { userId: _userId, ...flightColumns } = getTableColumns(flights);
+export { flightColumns };
+
 const DUPLICATE = { error: "已存在相同航班（航司 + 航班号 + 日期 + 出发机场）" };
 
 export const flightRoutes = new Hono<AppEnv>()
@@ -89,10 +99,11 @@ export const flightRoutes = new Hono<AppEnv>()
     const status = c.req.query("status");
     const parsed = z.enum(FLIGHT_STATUSES).optional().safeParse(status);
     if (!parsed.success) return c.json({ error: "status 只能是 confirmed 或 pending" }, 400);
+    const userId = c.get("user").id;
     const rows = await db
-      .select()
+      .select(flightColumns)
       .from(flights)
-      .where(parsed.data ? eq(flights.status, parsed.data) : undefined)
+      .where(and(eq(flights.userId, userId), parsed.data ? eq(flights.status, parsed.data) : undefined))
       .orderBy(desc(flights.flightDate), desc(flights.schedDepUtc));
     return c.json(rows);
   })
@@ -104,12 +115,13 @@ export const flightRoutes = new Hono<AppEnv>()
     const row = {
       ...withDerived(parsed.data),
       id: crypto.randomUUID(),
+      userId: c.get("user").id,
       status: parsed.data.status ?? "confirmed",
       createdAt: now,
       updatedAt: now,
     };
     try {
-      const [created] = await drizzle(c.env.DB).insert(flights).values(row).returning();
+      const [created] = await drizzle(c.env.DB).insert(flights).values(row).returning(flightColumns);
       return c.json(created, 201);
     } catch (err) {
       if (isUniqueViolation(err)) return c.json(DUPLICATE, 409);
@@ -125,8 +137,8 @@ export const flightRoutes = new Hono<AppEnv>()
       const [updated] = await drizzle(c.env.DB)
         .update(flights)
         .set({ ...values, ...(status ? { status } : {}), updatedAt: new Date().toISOString() })
-        .where(eq(flights.id, c.req.param("id")))
-        .returning();
+        .where(and(eq(flights.id, c.req.param("id")), eq(flights.userId, c.get("user").id)))
+        .returning(flightColumns);
       if (!updated) return c.json({ error: "航班不存在" }, 404);
       return c.json(updated);
     } catch (err) {
@@ -138,7 +150,7 @@ export const flightRoutes = new Hono<AppEnv>()
   .delete("/:id", async (c) => {
     const [deleted] = await drizzle(c.env.DB)
       .delete(flights)
-      .where(eq(flights.id, c.req.param("id")))
+      .where(and(eq(flights.id, c.req.param("id")), eq(flights.userId, c.get("user").id)))
       .returning({ id: flights.id });
     if (!deleted) return c.json({ error: "航班不存在" }, 404);
     return c.body(null, 204);
@@ -148,8 +160,14 @@ export const flightRoutes = new Hono<AppEnv>()
     const [updated] = await drizzle(c.env.DB)
       .update(flights)
       .set({ status: "confirmed", updatedAt: new Date().toISOString() })
-      .where(and(eq(flights.id, c.req.param("id")), eq(flights.status, "pending")))
-      .returning();
+      .where(
+        and(
+          eq(flights.id, c.req.param("id")),
+          eq(flights.userId, c.get("user").id),
+          eq(flights.status, "pending"),
+        ),
+      )
+      .returning(flightColumns);
     if (!updated) return c.json({ error: "没有这条待确认航班" }, 404);
     return c.json(updated);
   });

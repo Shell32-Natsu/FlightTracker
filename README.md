@@ -40,7 +40,7 @@ public/flags   国家/地区旗帜 SVG（country-flag-icons）
 
 ```bash
 npm install
-cp .dev.vars.example .dev.vars        # DEV_SKIP_AUTH=true，本地跳过 Access 校验
+cp .dev.vars.example .dev.vars        # DEV_SKIP_AUTH=true，本地跳过 Access 校验（可用 X-Dev-User 请求头模拟不同用户）
 npm run db:migrate:local              # 在本地 D1 建表
 npm run dev                           # http://localhost:5173
 ```
@@ -106,6 +106,14 @@ npm run db:migrate:remote
 npm run deploy
 git checkout wrangler.jsonc   # 脚本改动只用于这次部署，不要提交
 ```
+
+## 多用户
+
+每个人的航班和设置互相隔离。用户身份取自 Cloudflare Access 登录凭证里的 `sub`（换邮箱也不变），第一次访问时自动建用户。
+
+- **加人**：在 Access 应用的策略里加上对方邮箱即可，对方登录后看到的是自己的空数据。
+- **去重规则**：“航司 + 航班号 + 日期 + 出发机场”只在同一用户内唯一，两个人坐同一班飞机可以各记各的。
+- **旧数据**：迁移 `0002_multi_user` 之前的数据先归到占位用户 `legacy`，由第一个登录的用户认领（见 `src/worker/users.ts`）。
 
 ## 约定
 
