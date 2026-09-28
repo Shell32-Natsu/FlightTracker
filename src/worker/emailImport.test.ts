@@ -238,7 +238,7 @@ describe("正文识别（LLM）", () => {
       auth: PASS,
     });
     expect((await deliver(aliceInbox, raw)).status).toBe("failed");
-    expect((await emailLog())[0].error).toContain("ANTHROPIC_API_KEY");
+    expect((await emailLog())[0].error).toContain("没有可用的 AI 模型");
 
     const r = await deliver(aliceInbox, raw, "alice@gmail.com", stub([seg()]));
     expect(r.status).toBe("parsed");

@@ -111,29 +111,27 @@ git checkout wrangler.jsonc   # 脚本改动只用于这次部署，不要提交
 
 每个用户有一个专属收件地址（设置 → 邮件导入），把航司或旅行平台的确认邮件转发过去，识别出的航段进入“待确认”。
 
-**处理流程**（`src/worker/email/`）：收件地址里的随机串认出用户 → 校验发件人 → 存下正文 → 先找 schema.org `FlightReservation` 结构化数据，没有再交给 Claude 识别正文 → 校验机场、航班号后写成待确认航班。已有航段的改签会更新并转回待确认，取消会加备注提示删除。
+**处理流程**（`src/worker/email/`）：收件地址里的随机串认出用户 → 校验发件人 → 存下正文 → 先找 schema.org `FlightReservation` 结构化数据，没有再交给 AI 识别正文 → 校验机场、航班号后写成待确认航班。已有航段的改签会更新并转回待确认，取消会加备注提示删除。
 
 **发件人校验**：只接受用户登录邮箱和在设置里额外添加的邮箱，并要求 Email Routing 记录的验证结果通过——手动转发看信头 From 的 DMARC / DKIM，自动转发（如 Gmail 过滤器）看信封发件人的 SPF。认不出收件人的邮件直接丢弃。
 
+**识别正文用的模型**：默认 Cloudflare Workers AI（`@cf/meta/llama-3.3-70b-instruct-fp8-fast`，JSON Schema 约束输出），用 Workers 免费计划每天 10,000 Neurons 的额度，一封确认邮件约几百 Neurons，邮件内容不出 Cloudflare。配置了 `ANTHROPIC_API_KEY` 时改用 Claude（按量付费）。
+
 ### 配置
 
-**1. 收件地址用“子地址”形式**：一个固定地址加 `+{token}`，比如 `flights+f-k8m2x9q7ra@in.xiadong.info`。把模板填到 GitHub 仓库变量 `INBOUND_EMAIL`：
+**1. 收件地址**：用“子地址”形式——一个固定地址加 `+{token}`，比如 `flights+f-k8m2x9q7ra@xiadong.info`。把模板填到 GitHub 仓库变量 `INBOUND_EMAIL`：`flights+{token}@xiadong.info`。
 
-| 放在哪 | `INBOUND_EMAIL` | 说明 |
-| --- | --- | --- |
-| 子域名（推荐） | `flights+{token}@in.xiadong.info` | 只给子域名加 MX，主域名原来的邮件不受影响 |
-| 主域名 | `flights+{token}@xiadong.info` | 仅当主域名本来就不收邮件时用（开启 Email Routing 会改主域名的 MX） |
+**2. Email Routing**（Compute → Email Service → Email Routing，或在域名下找 Email Routing）：
+- 域名**已经在用 Email Routing**（MX 是 `*.mx.cloudflare.net`）：直接加规则即可，不影响已有地址——
+  - Settings 里打开 **Subaddressing**（`flights+xxx@` 会匹配 `flights@` 的规则）
+  - 添加自定义地址 `flights@xiadong.info` → 动作 **Send to a Worker** → `flighttracker`
+- 域名的邮件**托管在别处**（Google Workspace、iCloud 等）：不要在这个域名上开 Email Routing，开启流程会要求删除现有 MX 记录，子域名也一样。换一个不收邮件的域名来做收件地址。
 
-（Email Routing 的子域名只支持逐个列出的地址、不支持 catch-all，所以用子地址区分用户。）
+**3. API Token**：部署时如果报 Workers AI 相关的权限错误，给部署用的 token 加上 **Account → Workers AI → Read / Edit**（My Profile → API Tokens → 编辑）。
 
-**2. 在 Cloudflare 开启 Email Routing**（Compute → Email Service → Email Routing，或在域名下找 Email Routing）：
-- 用子域名时，先在 Email Routing 设置里添加子域名 `in.xiadong.info`（会给它加 MX / TXT 记录）
-- 在 Settings 里打开 **Subaddressing**（子地址，`flights+xxx@` 会匹配 `flights@` 的规则）
-- 添加路由规则：自定义地址 `flights@in.xiadong.info` → 动作 **Send to a Worker** → `flighttracker`
+**4.（可选）改用 Claude**：在 Anthropic Console 创建 API key，存为 GitHub 仓库 Secret `ANTHROPIC_API_KEY`，部署时会写入 Worker 的 secret。
 
-**3.（可选）识别没有结构化数据的邮件**：在 Anthropic Console 创建 API key，存为 GitHub 仓库 Secret `ANTHROPIC_API_KEY`，部署时会写入 Worker 的 secret。没有它也能用，只是只能识别带结构化数据的邮件（多数航司和 OTA 都带）。识别用 `claude-opus-5`（低 effort），每封邮件约几美分。
-
-改完变量后重新运行一次 **Deploy to Cloudflare**。
+改完变量后重新运行一次 **Deploy to Cloudflare**。本地开发（`npm run dev`）不连 Cloudflare，Workers AI 只在线上可用；测试里用桩函数代替。
 
 ## 多用户
 

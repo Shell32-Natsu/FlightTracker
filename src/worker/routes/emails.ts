@@ -42,7 +42,7 @@ export const emailRoutes = new Hono<AppEnv>()
       address: inboxAddress(token, template),
       loginEmail: user.email,
       senders: await allowedSenders(c.env.DB, user.id, user.email),
-      llm: !!c.env.ANTHROPIC_API_KEY,
+      llm: !!(c.env.ANTHROPIC_API_KEY || c.env.AI),
     });
   })
 

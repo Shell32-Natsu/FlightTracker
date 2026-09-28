@@ -11,7 +11,9 @@ export interface Env {
    * 也支持 "{token}@example.com" 形式（需要 catch-all）。为空表示未启用邮件导入。
    */
   INBOUND_EMAIL?: string;
-  /** 用 Claude 识别没有结构化数据的邮件（wrangler secret） */
+  /** Workers AI：识别没有结构化数据的邮件（免费额度内） */
+  AI?: Ai;
+  /** 可选：配置后改用 Claude 识别（wrangler secret） */
   ANTHROPIC_API_KEY?: string;
   /** 本地开发时设为 "true" 跳过 Access 校验（只写在 .dev.vars 里） */
   DEV_SKIP_AUTH?: string;

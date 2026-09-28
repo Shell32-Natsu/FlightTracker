@@ -85,8 +85,7 @@ export function EmailImportCard() {
           </div>
           {!inbox.data.llm && (
             <p className="faint small-note">
-              目前只能识别带结构化数据的邮件（多数航司和 OTA 都有）；服务端配置 ANTHROPIC_API_KEY
-              后可识别任意确认邮件。
+              服务端没有可用的 AI 模型，目前只能识别带结构化数据的邮件（多数航司和旅行平台都有）。
             </p>
           )}
           <SenderList loginEmail={inbox.data.loginEmail} />

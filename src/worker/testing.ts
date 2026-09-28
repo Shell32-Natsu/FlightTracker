@@ -22,7 +22,12 @@ export async function migrate(db: D1Database, sql: string) {
 }
 
 export async function startDb() {
-  const proxy = await getPlatformProxy<{ DB: D1Database }>({ configPath: "wrangler.jsonc", persist: false });
+  const proxy = await getPlatformProxy<{ DB: D1Database }>({
+    configPath: "wrangler.jsonc",
+    persist: false,
+    // AI 等远程绑定不连 Cloudflare：测试里用桩函数
+    remoteBindings: false,
+  });
   resetUserCache();
   return proxy;
 }

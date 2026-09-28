@@ -10,7 +10,9 @@ import type { Env } from "../env";
 import { checkSender, normalizeAddress } from "./auth";
 import { htmlToText } from "./html";
 import { segmentsFromJsonLd } from "./jsonld";
-import { ExtractionError, extractWithClaude } from "./llm";
+import { extractWithClaude } from "./llm";
+import { ExtractionError } from "./prompt";
+import { extractWithWorkersAi } from "./workersAi";
 import type { ExtractedSegment } from "./segments";
 
 /**
@@ -141,15 +143,9 @@ export async function processEmail(
     if (!segments.length) {
       const body = email.text?.trim() || (email.html ? htmlToText(email.html) : "");
       if (!body) throw new ExtractionError("邮件没有正文");
-      const llm =
-        deps.extractWithLlm ??
-        (env.ANTHROPIC_API_KEY
-          ? (s: string, t: string) => extractWithClaude(env.ANTHROPIC_API_KEY!, s, t)
-          : null);
+      const llm = deps.extractWithLlm ?? llmExtractor(env);
       if (!llm)
-        throw new ExtractionError(
-          "邮件里没有结构化的航班数据，而且服务端没有配置 ANTHROPIC_API_KEY，无法识别正文",
-        );
+        throw new ExtractionError("邮件里没有结构化的航班数据，而且服务端没有可用的 AI 模型，无法识别正文");
       method = "llm";
       segments = await llm(email.subject, body);
     }
@@ -171,6 +167,15 @@ export async function processEmail(
     await finish({ parseStatus: "failed", error: message, flightCount: 0 });
     return "failed";
   }
+}
+
+/** 识别正文用的模型：配置了 Claude 就用 Claude，否则用免费的 Workers AI。 */
+export function llmExtractor(
+  env: Env,
+): ((subject: string, text: string) => Promise<ExtractedSegment[]>) | null {
+  if (env.ANTHROPIC_API_KEY) return (s, t) => extractWithClaude(env.ANTHROPIC_API_KEY!, s, t);
+  if (env.AI) return (s, t) => extractWithWorkersAi(env.AI!, s, t);
+  return null;
 }
 
 /** 航段 → 航班表需要的字段（当地时间按机场时区换成 UTC）。 */

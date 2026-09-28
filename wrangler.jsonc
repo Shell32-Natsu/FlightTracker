@@ -23,6 +23,8 @@
       "migrations_dir": "migrations"
     }
   ],
+  // Workers AI：识别没有结构化数据的确认邮件（免费额度内），见 README“邮件导入”
+  "ai": { "binding": "AI" },
   "vars": {
     // 部署时由 scripts/ci-configure.mjs 从 GitHub 仓库变量填入，见 README“部署”
     "ACCESS_TEAM_DOMAIN": "",
