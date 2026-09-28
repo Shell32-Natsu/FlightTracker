@@ -15,6 +15,7 @@ let api: ReturnType<typeof apiAs>;
 let aliceInbox: string;
 
 const DOMAIN = "in.test";
+const TEMPLATE = `{token}@${DOMAIN}`;
 /** Cloudflare Email Routing 写入的验证结果（本人 gmail 手动转发的情形） */
 const PASS =
   "mx.cloudflare.net; dkim=pass header.d=gmail.com; spf=pass smtp.mailfrom=alice@gmail.com; dmarc=pass header.from=gmail.com";
@@ -103,7 +104,7 @@ const emailLog = async (user = "alice") =>
 
 beforeAll(async () => {
   proxy = await startDb();
-  env = { DB: proxy.env.DB, ASSETS: undefined as never, INBOUND_DOMAIN: DOMAIN };
+  env = { DB: proxy.env.DB, ASSETS: undefined as never, INBOUND_EMAIL: TEMPLATE };
   api = apiAs(env);
   for (const m of MIGRATIONS) await migrate(env.DB, m);
   // alice 的登录邮箱是 alice@localhost；允许的发件地址再加上她的 gmail
@@ -345,5 +346,18 @@ describe("重新解析与隔离", () => {
         )
       ).status,
     ).toBe("parsed");
+  });
+});
+
+describe("收件地址模板", () => {
+  it("子地址形式：flights+{token}@example.com，信封收件人带显示名也能认出", async () => {
+    const { inboxAddress, tokenFromRecipient, inboundTemplate } = await import("./email/ingest");
+    const t = inboundTemplate({ INBOUND_EMAIL: "Flights+{token}@Example.com" });
+    expect(t).toBe("flights+{token}@example.com");
+    const addr = inboxAddress("f-abc", t);
+    expect(addr).toBe("flights+f-abc@example.com");
+    expect(tokenFromRecipient(`Flights <${addr!.toUpperCase()}>`)).toBe("f-abc");
+    expect(tokenFromRecipient("f-abc@in.test")).toBe("f-abc");
+    expect(inboundTemplate({ INBOUND_EMAIL: "in.example.com" })).toBeNull();
   });
 });

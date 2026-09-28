@@ -1,7 +1,15 @@
 import { flightDistanceKm, flightDurationMin } from "../../shared/derive";
 import { greatCircleKm } from "../../shared/geo";
 import { localToUtc } from "../../shared/time";
-import type { Airport, Cabin, Flight, FlightInput, Purpose } from "../../shared/types";
+import type {
+  Airport,
+  Cabin,
+  EmailRecord,
+  Flight,
+  FlightInput,
+  InboxInfo,
+  Purpose,
+} from "../../shared/types";
 import { DEFAULT_SETTINGS, SETTING_KEYS, type Settings } from "../../shared/settings";
 import { assetUrl } from "./env";
 import { dedupeKey, flightsToCsv } from "../../shared/flightCsv";
@@ -15,6 +23,43 @@ import { DEMO_FLIGHTS, DEMO_PENDING } from "./demoData";
 let airports: Record<string, Airport> | null = null;
 let store: Flight[] | null = null;
 let settings: Settings = { ...DEFAULT_SETTINGS };
+
+/** 演示用的邮件导入记录：两段国泰航段来自第一封，其余展示各种处理结果。 */
+const DEMO_EMAIL_ID = "demo-email-1";
+const ago = (hours: number) => new Date(Date.now() - hours * 3600_000).toISOString();
+let inboxAddress = "flights+f-k8m2x9q7ra@in.example.com";
+const demoEmails: EmailRecord[] = [
+  {
+    id: DEMO_EMAIL_ID,
+    receivedAt: ago(2),
+    fromAddr: "demo@example.com",
+    subject: "Fwd: 国泰航空电子机票行程确认 K7Q2ZP",
+    parseStatus: "parsed",
+    parseMethod: "jsonld",
+    error: null,
+    flightCount: 2,
+  },
+  {
+    id: "demo-email-2",
+    receivedAt: ago(30),
+    fromAddr: "demo@example.com",
+    subject: "Fwd: 值机提醒：您的航班即将起飞",
+    parseStatus: "ignored",
+    parseMethod: "llm",
+    error: "邮件里没有找到航班行程",
+    flightCount: 0,
+  },
+  {
+    id: "demo-email-3",
+    receivedAt: ago(72),
+    fromAddr: "someone@unknown.example",
+    subject: "Your booking",
+    parseStatus: "ignored",
+    parseMethod: null,
+    error: "发件人 someone@unknown.example 不在你允许的发件地址里",
+    flightCount: 0,
+  },
+];
 
 const iso = (ms: number) => new Date(ms).toISOString().replace(/\.\d{3}Z$/, "Z");
 
@@ -34,7 +79,10 @@ const BLANK = {
   notes: null,
 } as const;
 
-type DemoInput = Pick<FlightInput, "flightDate" | "airline" | "flightNumber" | "depAirport" | "arrAirport" | "source"> &
+type DemoInput = Pick<
+  FlightInput,
+  "flightDate" | "airline" | "flightNumber" | "depAirport" | "arrAirport" | "source"
+> &
   Partial<FlightInput>;
 
 function makeFlight(partial: DemoInput): Flight {
@@ -91,7 +139,7 @@ async function ready(): Promise<Flight[]> {
         aircraftType: aircraft,
         confirmationCode: pnr,
       }),
-    ),
+    ).map((f) => ({ ...f, emailId: DEMO_EMAIL_ID })),
   ];
   return store;
 }
@@ -107,7 +155,8 @@ function validate(input: FlightInput, id?: string): string | null {
   if (!/^\d{1,4}[A-Z]?$/.test(input.flightNumber)) return "航班号为 1–4 位数字";
   if (!airports![input.depAirport] || !airports![input.arrAirport]) return "机场表里没有这个三字码";
   if (input.depAirport === input.arrAirport) return "起降机场不能相同";
-  if (input.schedDepUtc && input.schedArrUtc && input.schedArrUtc <= input.schedDepUtc) return "计划到达需晚于计划起飞";
+  if (input.schedDepUtc && input.schedArrUtc && input.schedArrUtc <= input.schedDepUtc)
+    return "计划到达需晚于计划起飞";
   const dup = store!.find(
     (f) =>
       f.id !== id &&
@@ -143,6 +192,26 @@ export async function demoFetch(path: string, init: RequestInit): Promise<Respon
     }
     return json(settings);
   }
+  if (parts[0] === "inbox") {
+    if (parts[1] === "rotate" && method === "POST") {
+      inboxAddress = `flights+f-${Math.random().toString(36).slice(2, 12).padEnd(10, "x")}@in.example.com`;
+      return json({ address: inboxAddress });
+    }
+    const info: InboxInfo = {
+      address: inboxAddress,
+      loginEmail: "demo@example.com",
+      senders: ["demo@example.com", ...settings.importSenders],
+      llm: true,
+    };
+    return json(info);
+  }
+  if (parts[0] === "emails") {
+    if (parts[2] === "reparse" && method === "POST") {
+      const e = demoEmails.find((x) => x.id === parts[1]);
+      return e ? json(e) : json({ error: "邮件不存在" }, 404);
+    }
+    return json(demoEmails);
+  }
   if (parts[0] === "import" && method === "POST" && init.body) {
     const items = (JSON.parse(String(init.body)) as { flights: FlightInput[] }).flights;
     const existing = new Set(flights.map(dedupeKey));
@@ -160,12 +229,18 @@ export async function demoFetch(path: string, init: RequestInit): Promise<Respon
     return json({ inserted, duplicates: items.length - invalid.length - inserted, invalid });
   }
   if (parts[0] === "export" && parts[1] === "csv") {
-    return new Response(flightsToCsv(flights.filter((f) => f.status === "confirmed"), airports!), {
-      headers: {
-        "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="flighttracker-demo.csv"`,
+    return new Response(
+      flightsToCsv(
+        flights.filter((f) => f.status === "confirmed"),
+        airports!,
+      ),
+      {
+        headers: {
+          "Content-Type": "text/csv; charset=utf-8",
+          "Content-Disposition": `attachment; filename="flighttracker-demo.csv"`,
+        },
       },
-    });
+    );
   }
   if (parts[0] !== "flights") return json({ error: "Not found" }, 404);
 

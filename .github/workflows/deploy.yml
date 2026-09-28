@@ -24,6 +24,9 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       ACCESS_TEAM_DOMAIN: ${{ vars.ACCESS_TEAM_DOMAIN }}
       ACCESS_AUD: ${{ vars.ACCESS_AUD }}
+      # 可选：邮件导入
+      INBOUND_EMAIL: ${{ vars.INBOUND_EMAIL }}
+      HAS_ANTHROPIC_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -39,3 +42,9 @@ jobs:
       - run: npm run build
       - name: Deploy Worker
         run: npx wrangler deploy
+      # 密钥只交给这一步，不暴露给安装依赖、测试和构建
+      - name: Set Claude API key (optional, for email import)
+        if: ${{ env.HAS_ANTHROPIC_KEY == 'true' }}
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: echo "$ANTHROPIC_API_KEY" | npx wrangler secret put ANTHROPIC_API_KEY

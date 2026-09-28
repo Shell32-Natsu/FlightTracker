@@ -8,7 +8,6 @@ import {
   FlaskConical,
   Image,
   LocateFixed,
-  MailPlus,
   Ruler,
   ScanSearch,
 } from "lucide-react";
@@ -21,6 +20,7 @@ import { RouteGlobe } from "../components/RouteGlobe";
 import { useUnit } from "../lib/useUnit";
 import { Segmented } from "../ui/Segmented";
 import { Logo } from "../ui/Logo";
+import { EmailImportCard } from "../components/EmailImportCard";
 
 const ROADMAP = [
   {
@@ -29,7 +29,6 @@ const ROADMAP = [
     desc: "输入航班号和日期，自动带出时间、机型和机尾号",
     tag: "M3",
   },
-  { icon: MailPlus, title: "邮件转发导入", desc: "把确认邮件转发到专用地址，自动识别航段", tag: "M4" },
 ];
 
 export function SettingsPage() {
@@ -77,6 +76,8 @@ export function SettingsPage() {
         </section>
 
         <HomeAirportSetting />
+
+        <EmailImportCard />
 
         <ImportExportCard />
 

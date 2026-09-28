@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Flight, FlightInput, FlightStatus } from "../../shared/types";
+import type { EmailRecord, Flight, FlightInput, FlightStatus, InboxInfo } from "../../shared/types";
 import { DEFAULT_SETTINGS, type Settings } from "../../shared/settings";
 
 export class ApiError extends Error {
@@ -139,4 +139,33 @@ export async function downloadExportCsv(): Promise<void> {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/** 邮件导入：专属收件地址和允许的发件人。 */
+export function useInbox() {
+  return useQuery({ queryKey: ["inbox"], queryFn: () => request<InboxInfo>("/inbox") });
+}
+
+export function useRotateInbox() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => request<{ address: string }>("/inbox/rotate", { method: "POST" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["inbox"] }),
+  });
+}
+
+/** 最近收到的邮件和处理结果。 */
+export function useEmails() {
+  return useQuery({ queryKey: ["emails"], queryFn: () => request<EmailRecord[]>("/emails") });
+}
+
+export function useReparseEmail() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => request<EmailRecord>(`/emails/${id}/reparse`, { method: "POST" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["emails"] });
+      qc.invalidateQueries({ queryKey: ["flights"] });
+    },
+  });
 }

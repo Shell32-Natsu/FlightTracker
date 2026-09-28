@@ -11,7 +11,7 @@
 | M1 基础骨架 | Worker + Access 校验、D1 建表、手动添加航班、航班列表 | ✅ |
 | M2 地图统计 | 参考数据脚本、航线地图、统计页、时区测试 | ✅ |
 | M3 自动补全 | AeroDataBox 查询 + 缓存、CSV 导入导出 | CSV 导入导出 ✅（含 Flighty），补全待做 |
-| M4 邮件导入 | Email Routing、JSON-LD / LLM 解析、待确认页 | 待确认页已就绪 |
+| M4 邮件导入 | 每人专属收件地址、发件人校验、JSON-LD / Claude 识别航段、待确认 | ✅ |
 | M5 图片导出 | D3 海报模板、字体内嵌、PNG 导出 | ✅ |
 | M6 航线动画 | Canvas 逐帧渲染、镜头推拉、WebCodecs 导出 MP4（不支持 H.264 时退回 WebM） | ✅ |
 
@@ -106,6 +106,34 @@ npm run db:migrate:remote
 npm run deploy
 git checkout wrangler.jsonc   # 脚本改动只用于这次部署，不要提交
 ```
+
+## 邮件导入
+
+每个用户有一个专属收件地址（设置 → 邮件导入），把航司或旅行平台的确认邮件转发过去，识别出的航段进入“待确认”。
+
+**处理流程**（`src/worker/email/`）：收件地址里的随机串认出用户 → 校验发件人 → 存下正文 → 先找 schema.org `FlightReservation` 结构化数据，没有再交给 Claude 识别正文 → 校验机场、航班号后写成待确认航班。已有航段的改签会更新并转回待确认，取消会加备注提示删除。
+
+**发件人校验**：只接受用户登录邮箱和在设置里额外添加的邮箱，并要求 Email Routing 记录的验证结果通过——手动转发看信头 From 的 DMARC / DKIM，自动转发（如 Gmail 过滤器）看信封发件人的 SPF。认不出收件人的邮件直接丢弃。
+
+### 配置
+
+**1. 收件地址用“子地址”形式**：一个固定地址加 `+{token}`，比如 `flights+f-k8m2x9q7ra@in.xiadong.info`。把模板填到 GitHub 仓库变量 `INBOUND_EMAIL`：
+
+| 放在哪 | `INBOUND_EMAIL` | 说明 |
+| --- | --- | --- |
+| 子域名（推荐） | `flights+{token}@in.xiadong.info` | 只给子域名加 MX，主域名原来的邮件不受影响 |
+| 主域名 | `flights+{token}@xiadong.info` | 仅当主域名本来就不收邮件时用（开启 Email Routing 会改主域名的 MX） |
+
+（Email Routing 的子域名只支持逐个列出的地址、不支持 catch-all，所以用子地址区分用户。）
+
+**2. 在 Cloudflare 开启 Email Routing**（Compute → Email Service → Email Routing，或在域名下找 Email Routing）：
+- 用子域名时，先在 Email Routing 设置里添加子域名 `in.xiadong.info`（会给它加 MX / TXT 记录）
+- 在 Settings 里打开 **Subaddressing**（子地址，`flights+xxx@` 会匹配 `flights@` 的规则）
+- 添加路由规则：自定义地址 `flights@in.xiadong.info` → 动作 **Send to a Worker** → `flighttracker`
+
+**3.（可选）识别没有结构化数据的邮件**：在 Anthropic Console 创建 API key，存为 GitHub 仓库 Secret `ANTHROPIC_API_KEY`，部署时会写入 Worker 的 secret。没有它也能用，只是只能识别带结构化数据的邮件（多数航司和 OTA 都带）。识别用 `claude-opus-5`（低 effort），每封邮件约几美分。
+
+改完变量后重新运行一次 **Deploy to Cloudflare**。
 
 ## 多用户
 

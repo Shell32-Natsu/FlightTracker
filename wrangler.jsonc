@@ -26,6 +26,8 @@
   "vars": {
     // 部署时由 scripts/ci-configure.mjs 从 GitHub 仓库变量填入，见 README“部署”
     "ACCESS_TEAM_DOMAIN": "",
-    "ACCESS_AUD": ""
+    "ACCESS_AUD": "",
+    // 邮件导入收件地址模板（可选），如 "flights+{token}@in.example.com"，见 README“邮件导入”
+    "INBOUND_EMAIL": ""
   }
 }

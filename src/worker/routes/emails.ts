@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { emails, users } from "../db/schema";
-import { allowedSenders, inboxAddress, newInboxToken, processEmail } from "../email/ingest";
+import { allowedSenders, inboundTemplate, inboxAddress, newInboxToken, processEmail } from "../email/ingest";
 import type { AppEnv } from "../env";
 
 /** 列表里返回的列：不带正文。 */
@@ -36,10 +36,10 @@ export const emailRoutes = new Hono<AppEnv>()
   /** 我的收件地址和允许的发件人。 */
   .get("/inbox", async (c) => {
     const user = c.get("user");
-    const domain = c.env.INBOUND_DOMAIN?.trim() || undefined;
-    const token = domain ? await ensureInboxToken(c.env.DB, user.id) : null;
+    const template = inboundTemplate(c.env);
+    const token = template ? await ensureInboxToken(c.env.DB, user.id) : null;
     return c.json({
-      address: inboxAddress(token, domain),
+      address: inboxAddress(token, template),
       loginEmail: user.email,
       senders: await allowedSenders(c.env.DB, user.id, user.email),
       llm: !!c.env.ANTHROPIC_API_KEY,
@@ -48,14 +48,14 @@ export const emailRoutes = new Hono<AppEnv>()
 
   /** 重新生成收件地址（旧地址立即失效）。 */
   .post("/inbox/rotate", async (c) => {
-    const domain = c.env.INBOUND_DOMAIN?.trim();
-    if (!domain) return c.json({ error: "服务端没有配置收件域名" }, 400);
+    const template = inboundTemplate(c.env);
+    if (!template) return c.json({ error: "服务端没有配置收件地址（INBOUND_EMAIL）" }, 400);
     const token = newInboxToken();
     await drizzle(c.env.DB)
       .update(users)
       .set({ inboxToken: token })
       .where(eq(users.id, c.get("user").id));
-    return c.json({ address: inboxAddress(token, domain) });
+    return c.json({ address: inboxAddress(token, template) });
   })
 
   .get("/emails", async (c) => {

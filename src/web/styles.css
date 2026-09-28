@@ -3575,3 +3575,272 @@ input[type="time"]::-webkit-calendar-picker-indicator {
     opacity: 1;
   }
 }
+
+/* —— 邮件导入 —— */
+.link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--gold);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.bad {
+  color: var(--danger);
+}
+
+.spin {
+  animation: spin 0.9s linear infinite;
+}
+
+.email-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.inbox-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.inbox-address {
+  flex: 1 1 260px;
+  min-width: 0;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 184, 77, 0.35);
+  background: var(--gold-wash);
+  color: var(--gold-2);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.95rem;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.sender-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sender-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sender-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 4px 6px 4px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line-2);
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.sender-chip.locked {
+  padding-right: 12px;
+  color: var(--text-2);
+}
+
+.sender-chip button {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+}
+
+.sender-chip button:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-1);
+}
+
+.sender-add {
+  display: flex;
+  gap: 8px;
+}
+
+.sender-add .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.email-log {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.email-log ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.email-log li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+  padding: 12px 14px;
+}
+
+.email-log li + li {
+  border-top: 1px solid var(--line);
+}
+
+.email-status {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-3);
+}
+
+.email-status.ok {
+  background: rgba(61, 220, 151, 0.12);
+  color: var(--good);
+}
+
+.email-status.bad {
+  background: var(--danger-wash);
+  color: var(--danger);
+}
+
+.email-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.email-main b {
+  font-weight: 550;
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.email-main small {
+  font-size: 0.78rem;
+  color: var(--text-3);
+  overflow-wrap: anywhere;
+}
+
+.email-main small.bad {
+  color: var(--danger);
+}
+
+.email-main small svg {
+  vertical-align: -1px;
+}
+
+.email-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.email-actions .icon-button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid var(--line-2);
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.email-actions .icon-button:hover {
+  color: var(--text-1);
+  border-color: var(--line-3);
+}
+
+.ticket-note {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  margin: 0 18px 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 184, 77, 0.08);
+  border: 1px solid rgba(255, 184, 77, 0.25);
+  color: var(--gold-2);
+  font-size: 0.8rem;
+  white-space: pre-line;
+}
+
+.ticket-note svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+.ticket-source-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.email-status {
+  min-width: 4.6em;
+  text-align: center;
+}
+
+@media (max-width: 560px) {
+  .email-log li {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "status actions"
+      "main main";
+    row-gap: 6px;
+  }
+
+  .email-status {
+    grid-area: status;
+    justify-self: start;
+  }
+
+  .email-actions {
+    grid-area: actions;
+  }
+
+  .email-main {
+    grid-area: main;
+  }
+
+  .email-main b {
+    white-space: normal;
+  }
+}

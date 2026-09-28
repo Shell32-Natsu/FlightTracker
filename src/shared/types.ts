@@ -71,3 +71,30 @@ export interface Airline {
   icao?: string;
   country?: string;
 }
+
+export const EMAIL_STATUSES = ["pending", "parsed", "failed", "ignored"] as const;
+export type EmailStatus = (typeof EMAIL_STATUSES)[number];
+
+/** 邮件导入记录（不含正文）。 */
+export interface EmailRecord {
+  id: string;
+  receivedAt: string;
+  fromAddr: string | null;
+  subject: string | null;
+  parseStatus: EmailStatus;
+  parseMethod: "jsonld" | "llm" | null;
+  error: string | null;
+  /** 新增或更新的航段数 */
+  flightCount: number;
+}
+
+/** 当前用户的邮件导入配置。 */
+export interface InboxInfo {
+  /** 专属收件地址；服务端没配置收件域名时为 null */
+  address: string | null;
+  loginEmail: string;
+  /** 允许的发件地址（登录邮箱 + 额外添加的） */
+  senders: string[];
+  /** 服务端是否配置了 Claude，能识别没有结构化数据的邮件 */
+  llm: boolean;
+}

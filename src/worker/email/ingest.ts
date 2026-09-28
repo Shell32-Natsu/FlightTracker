@@ -35,8 +35,25 @@ export function newInboxToken(): string {
   return `f-${[...bytes].map((b) => ALPHABET[b % ALPHABET.length]).join("")}`;
 }
 
-export function inboxAddress(token: string | null, domain: string | undefined): string | null {
-  return token && domain ? `${token}@${domain}` : null;
+/** 模板必须是一个邮件地址且含 {token}。 */
+export function inboundTemplate(env: Pick<Env, "INBOUND_EMAIL">): string | null {
+  const t = env.INBOUND_EMAIL?.trim().toLowerCase();
+  return t && t.includes("{token}") && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(t) ? t : null;
+}
+
+export function inboxAddress(token: string | null, template: string | null): string | null {
+  return token && template ? template.replace("{token}", token) : null;
+}
+
+/** 从收件地址里取出用户 token：有 +标签取标签，否则取整个本地部分。 */
+export function tokenFromRecipient(to: string): string {
+  const local = to
+    .trim()
+    .toLowerCase()
+    .replace(/^.*<([^>]+)>.*$/, "$1")
+    .split("@")[0];
+  const plus = local.indexOf("+");
+  return plus >= 0 ? local.slice(plus + 1) : local;
 }
 
 /** 用户允许的发件地址：登录邮箱 + 设置里额外添加的。 */
@@ -61,7 +78,7 @@ export type ReceiveResult =
 
 export async function receiveEmail(env: Env, mail: IncomingMail, deps: Deps = {}): Promise<ReceiveResult> {
   const db = drizzle(env.DB);
-  const token = normalizeAddress(mail.to).split("@")[0];
+  const token = tokenFromRecipient(mail.to);
   const [user] = await db.select().from(users).where(eq(users.inboxToken, token)).limit(1);
   // 认不出收件人：直接丢弃，不入库（避免垃圾邮件占空间）
   if (!user) return { status: "unknown-recipient" };

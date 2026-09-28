@@ -1,7 +1,7 @@
 /**
  * 部署前（CI 里）补全 wrangler.jsonc：
  *  1. 找到名为 flighttracker 的 D1 数据库，不存在就创建，把 id 写进配置
- *  2. 把 Access 的团队域名和 AUD 从环境变量写进 vars
+ *  2. 把 Access 的团队域名和 AUD、邮件导入地址模板（可选）从环境变量写进 vars
  *
  * 只改 CI 工作目录里的文件，不提交回仓库。
  * 需要环境变量：CLOUDFLARE_API_TOKEN、CLOUDFLARE_ACCOUNT_ID、ACCESS_TEAM_DOMAIN、ACCESS_AUD
@@ -47,5 +47,6 @@ const set = (key, value) => {
 set("database_id", id);
 set("ACCESS_TEAM_DOMAIN", process.env.ACCESS_TEAM_DOMAIN.replace(/^https?:\/\//, "").replace(/\/+$/, ""));
 set("ACCESS_AUD", process.env.ACCESS_AUD.trim());
+set("INBOUND_EMAIL", (process.env.INBOUND_EMAIL ?? "").trim());
 writeFileSync(CONFIG, config);
 console.log(`已写入 ${CONFIG}`);
