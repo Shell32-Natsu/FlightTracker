@@ -100,3 +100,30 @@ export interface InboxInfo {
   /** 服务端是否配置了 Claude，能识别没有结构化数据的邮件 */
   llm: boolean;
 }
+
+/** 航班数据服务按航班号 + 日期查到的一段航班；时间都是 UTC ISO。 */
+export interface LookupCandidate {
+  airline: string;
+  flightNumber: string;
+  /** 代码共享时的实际承运航司 */
+  operatingAirline: string | null;
+  depAirport: string | null;
+  arrAirport: string | null;
+  schedDepUtc: string | null;
+  schedArrUtc: string | null;
+  /** 已经飞过的航班才有：实际（或最新预计）上下客时间 */
+  actualDepUtc: string | null;
+  actualArrUtc: string | null;
+  /** 机型名称，如 "Boeing 777-300ER" */
+  aircraftModel: string | null;
+  /** 对应的 ICAO 机型代码，如 B77W；认不出为 null */
+  aircraftType: string | null;
+  registration: string | null;
+  status: string | null;
+}
+
+export interface LookupResult {
+  candidates: LookupCandidate[];
+  /** 是否来自缓存 */
+  cached: boolean;
+}

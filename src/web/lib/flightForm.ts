@@ -1,5 +1,5 @@
 import { addDays, dayDiff, localToUtc, utcToLocal } from "../../shared/time";
-import type { Airport, Cabin, Flight, FlightInput, Purpose } from "../../shared/types";
+import type { Airport, Cabin, Flight, FlightInput, LookupCandidate, Purpose } from "../../shared/types";
 
 /**
  * 表单里的时间都是机场当地时间：起飞时间按出发机场、到达时间按到达机场。
@@ -127,4 +127,54 @@ export function flightToForm(fl: Flight, airports: Record<string, Airport>): Fli
     confirmationCode: fl.confirmationCode ?? "",
     notes: fl.notes ?? "",
   };
+}
+
+/**
+ * 把航班数据服务查到的一段填进表单：航线、计划 / 实际时间（换成机场当地时间和日期偏移）、
+ * 机型、机尾号、实际承运航司。返回新表单和填了哪些项（给用户看）。
+ */
+export function applyLookup(
+  f: FlightFormState,
+  c: LookupCandidate,
+  airports: Record<string, Airport>,
+): { form: FlightFormState; filled: string[] } {
+  const next = { ...f };
+  const filled: string[] = [];
+  const dep = c.depAirport ? airports[c.depAirport] : undefined;
+  const arr = c.arrAirport ? airports[c.arrAirport] : undefined;
+  if (dep && arr) {
+    next.depAirport = c.depAirport!;
+    next.arrAirport = c.arrAirport!;
+    filled.push("航线");
+  }
+  // 当地时间 + 相对起飞日期的天数；超出表单能表示的范围就不填
+  const local = (utc: string | null, ap: Airport | undefined): [string, number] | null => {
+    if (!utc || !ap) return null;
+    const l = utcToLocal(utc, ap.tz);
+    const offset = dayDiff(next.flightDate, l.date);
+    return offset >= -1 && offset <= 2 ? [l.time, offset] : null;
+  };
+  const sd = local(c.schedDepUtc, dep);
+  const sa = local(c.schedArrUtc, arr);
+  if (sd && sd[1] === 0) next.schedDep = sd[0];
+  if (sa) [next.schedArr, next.schedArrOffset] = sa;
+  if ((sd && sd[1] === 0) || sa) filled.push("计划时间");
+  const ad = local(c.actualDepUtc, dep);
+  const aa = local(c.actualArrUtc, arr);
+  if (ad) [next.actualDep, next.actualDepOffset] = ad;
+  if (aa) [next.actualArr, next.actualArrOffset] = aa;
+  if (ad || aa) filled.push("实际时间");
+  if (c.aircraftType) {
+    next.aircraftType = c.aircraftType;
+    filled.push(`机型 ${c.aircraftType}`);
+  }
+  if (c.registration) {
+    next.registration = c.registration;
+    filled.push(`机尾号 ${c.registration}`);
+  }
+  if (c.operatingAirline) {
+    next.operatingAirline = c.operatingAirline;
+    filled.push(`实际承运 ${c.operatingAirline}`);
+  }
+  return { form: next, filled };
 }

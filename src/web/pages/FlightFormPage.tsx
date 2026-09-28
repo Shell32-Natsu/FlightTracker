@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeftRight, ChevronLeft, Clapperboard, Image as ImageIcon, Trash2 } from "lucide-react";
-import { useCreateFlight, useDeleteFlight, useFlights, useUpdateFlight } from "../lib/api";
+import { ArrowLeftRight, ChevronLeft, Clapperboard, Image as ImageIcon, ScanSearch, Trash2 } from "lucide-react";
+import { lookupFlight, useCreateFlight, useDeleteFlight, useFlights, useMe, useUpdateFlight } from "../lib/api";
 import { useRefData, useWorldTopo, type RefData } from "../lib/refdata";
 import {
+  applyLookup,
   emptyForm,
   flightToForm,
   formToInput,
@@ -15,9 +16,9 @@ import { RouteGlobe } from "../components/RouteGlobe";
 import { FlightTicket, type TicketData } from "../ticket/FlightTicket";
 import { Segmented } from "../ui/Segmented";
 import { ConfirmButton } from "../ui/ConfirmButton";
-import { CABINS, PURPOSES, type Flight } from "../../shared/types";
+import { CABINS, PURPOSES, type Flight, type LookupCandidate } from "../../shared/types";
 import { flightDistanceKm, flightDurationMin } from "../../shared/derive";
-import { formatDuration } from "../../shared/time";
+import { formatDuration, utcToLocal } from "../../shared/time";
 import { CABIN_LABEL, PURPOSE_LABEL, cityName } from "../lib/format";
 import { useUnit } from "../lib/useUnit";
 
@@ -66,6 +67,13 @@ function FlightForm({ refData, flight }: { refData: RefData; flight?: Flight }) 
   );
   const [code, setCode] = useState(flight ? `${flight.airline}${flight.flightNumber}` : "");
   const [error, setError] = useState<string | null>(null);
+  const me = useMe();
+  const [lookup, setLookup] = useState<
+    | { kind: "busy" }
+    | { kind: "done" | "error"; text: string }
+    | { kind: "choose"; candidates: LookupCandidate[] }
+    | null
+  >(null);
 
   const set = <K extends keyof FlightFormState>(k: K, v: FlightFormState[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
@@ -129,6 +137,34 @@ function FlightForm({ refData, flight }: { refData: RefData; flight?: Flight }) 
     if (!flight) return;
     await del.mutateAsync(flight.id);
     back();
+  };
+
+  /** 用查到的一段填表 */
+  const fillFrom = (c: LookupCandidate) => {
+    const { filled } = applyLookup(form, c, refData.airports);
+    setForm((f) => applyLookup(f, c, refData.airports).form);
+    setLookup({ kind: "done", text: filled.length ? `已填入：${filled.join("、")}` : "查到了，但没有可以补充的信息" });
+  };
+
+  const runLookup = async () => {
+    setLookup({ kind: "busy" });
+    try {
+      const { candidates } = await lookupFlight(`${form.airline}${form.flightNumber}`, form.flightDate);
+      const code = `${form.airline}${form.flightNumber}`;
+      if (!candidates.length) {
+        setLookup({ kind: "error", text: `没查到 ${form.flightDate} 的 ${code}，请检查航班号和日期（当地起飞日期）` });
+        return;
+      }
+      // 已填了机场就按机场挑；一个航班号可能有多段经停
+      const match = candidates.filter(
+        (c) => (!dep || c.depAirport === depCode) && (!arr || c.arrAirport === arrCode),
+      );
+      if (match.length === 1) fillFrom(match[0]);
+      else if (candidates.length === 1 && !dep && !arr) fillFrom(candidates[0]);
+      else setLookup({ kind: "choose", candidates });
+    } catch (err) {
+      setLookup({ kind: "error", text: err instanceof Error ? err.message : String(err) });
+    }
   };
 
   const swap = () => setForm((f) => ({ ...f, depAirport: f.arrAirport, arrAirport: f.depAirport }));
@@ -206,6 +242,39 @@ function FlightForm({ refData, flight }: { refData: RefData; flight?: Flight }) 
                   onChange={(e) => set("flightDate", e.target.value)}
                 />
               </Field>
+              {me.data?.lookup && (
+                <div className="lookup-row">
+                  <button
+                    type="button"
+                    className="button"
+                    onClick={() => void runLookup()}
+                    disabled={!form.airline || !form.flightDate || lookup?.kind === "busy"}
+                  >
+                    <ScanSearch size={16} /> {lookup?.kind === "busy" ? "查询中…" : "查询航班信息"}
+                  </button>
+                  {lookup?.kind === "done" || lookup?.kind === "error" ? (
+                    <span className={`lookup-status ${lookup.kind === "error" ? "bad" : "ok"}`} aria-live="polite">
+                      {lookup.text}
+                    </span>
+                  ) : lookup?.kind === "choose" ? (
+                    <span className="lookup-status">这个航班号当天有多段，选一段：</span>
+                  ) : (
+                    <span className="lookup-status faint">按航班号和日期自动填航线、时间、机型和机尾号</span>
+                  )}
+                  {lookup?.kind === "choose" && (
+                    <div className="chips wrap lookup-choices">
+                      {lookup.candidates.map((c, i) => (
+                        <button key={i} type="button" className="chip" onClick={() => fillFrom(c)}>
+                          {c.depAirport} → {c.arrAirport}
+                          {c.schedDepUtc && refData.airports[c.depAirport ?? ""]
+                            ? ` · ${utcToLocal(c.schedDepUtc, refData.airports[c.depAirport!].tz).time}`
+                            : ""}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="route-inputs">
                 <Field
                   label="出发"

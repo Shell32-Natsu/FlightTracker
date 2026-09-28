@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | M1 基础骨架 | Worker + Access 校验、D1 建表、手动添加航班、航班列表 | ✅ |
 | M2 地图统计 | 参考数据脚本、航线地图、统计页、时区测试 | ✅ |
-| M3 自动补全 | AeroDataBox 查询 + 缓存、CSV 导入导出 | CSV 导入导出 ✅（含 Flighty），补全待做 |
+| M3 自动补全 | AeroDataBox 查询 + 缓存、CSV 导入导出 | ✅ |
 | M4 邮件导入 | 每人专属收件地址、发件人校验、JSON-LD / Claude 识别航段、待确认 | ✅ |
 | M5 图片导出 | D3 海报模板、字体内嵌、PNG 导出 | ✅ |
 | M6 航线动画 | Canvas 逐帧渲染、镜头推拉、WebCodecs 导出 MP4（不支持 H.264 时退回 WebM） | ✅ |
@@ -140,6 +140,14 @@ git checkout wrangler.jsonc   # 脚本改动只用于这次部署，不要提交
 - **加人**：在 Access 应用的策略里加上对方邮箱即可，对方登录后看到的是自己的空数据。
 - **去重规则**：“航司 + 航班号 + 日期 + 出发机场”只在同一用户内唯一，两个人坐同一班飞机可以各记各的。
 - **旧数据**：迁移 `0002_multi_user` 之前的数据先归到占位用户 `legacy`，由第一个登录的用户认领（见 `src/worker/users.ts`）。
+
+## 航班信息补全
+
+按航班号 + 起飞当地日期查航线、计划 / 实际时间、机型和机尾号，数据来自 [AeroDataBox](https://aerodatabox.com/)（RapidAPI）。
+
+- **在哪里用**：添加 / 编辑航班页的“查询航班信息”按钮；邮件导入时自动补机型、机尾号和邮件里缺的时刻（查不到或额度用完时照常导入）。
+- **缓存**：`lookup_cache` 表，所有用户共用。起飞两天以前的航班永久缓存；最近和未来的有结果缓存 6 小时、查不到缓存 1 小时。
+- **配置**：在 [RapidAPI 的 AeroDataBox 页面](https://rapidapi.com/aedbx-aedbx/api/aerodatabox) 订阅免费的 Basic 套餐，把 key 存成 GitHub 仓库的 secret `AERODATABOX_API_KEY`，重新部署即可（本地开发写进 `.dev.vars`）。没配置时查询按钮不显示，其他功能不受影响。
 
 ## 航司徽标与机型
 

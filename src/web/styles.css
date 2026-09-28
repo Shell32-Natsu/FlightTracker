@@ -1915,6 +1915,37 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   color: var(--text-2);
 }
 
+.lookup-row {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.lookup-status {
+  flex: 1 1 200px;
+  min-width: 0;
+  font-size: 0.82rem;
+  color: var(--text-2);
+}
+
+.lookup-status.ok {
+  color: var(--good);
+}
+
+.lookup-status.faint {
+  color: var(--text-3);
+}
+
+.lookup-status.bad {
+  color: var(--danger);
+}
+
+.lookup-choices {
+  flex-basis: 100%;
+}
+
 .route-inputs {
   grid-column: 1 / -1;
   position: relative;

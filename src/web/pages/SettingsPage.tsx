@@ -9,7 +9,6 @@ import {
   Image,
   LocateFixed,
   Ruler,
-  ScanSearch,
 } from "lucide-react";
 import { DEMO } from "../lib/env";
 import { downloadExportCsv, useFlights, useSettings, useUpdateSettings } from "../lib/api";
@@ -22,14 +21,6 @@ import { Segmented } from "../ui/Segmented";
 import { Logo } from "../ui/Logo";
 import { EmailImportCard } from "../components/EmailImportCard";
 
-const ROADMAP = [
-  {
-    icon: ScanSearch,
-    title: "航班号自动补全",
-    desc: "输入航班号和日期，自动带出时间、机型和机尾号",
-    tag: "M3",
-  },
-];
 
 export function SettingsPage() {
   const [unit, setUnit] = useUnit();
@@ -107,26 +98,6 @@ export function SettingsPage() {
               打开
             </Link>
           </div>
-        </section>
-
-        <section className="card">
-          <div className="card-head">
-            <h2 className="section-title">即将推出</h2>
-          </div>
-          <ul className="roadmap">
-            {ROADMAP.map(({ icon: Icon, title, desc, tag }) => (
-              <li key={title}>
-                <span className="ico">
-                  <Icon size={18} />
-                </span>
-                <span className="txt">
-                  <b>{title}</b>
-                  <span>{desc}</span>
-                </span>
-                <span className="tag">{tag}</span>
-              </li>
-            ))}
-          </ul>
         </section>
 
         <section className="card">

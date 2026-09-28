@@ -27,6 +27,8 @@ jobs:
       # 可选：邮件导入
       INBOUND_EMAIL: ${{ vars.INBOUND_EMAIL }}
       HAS_ANTHROPIC_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+      # 可选：按航班号补全时刻、机型、机尾号
+      HAS_AERODATABOX_KEY: ${{ secrets.AERODATABOX_API_KEY != '' }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -48,3 +50,8 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: echo "$ANTHROPIC_API_KEY" | npx wrangler secret put ANTHROPIC_API_KEY
+      - name: Set AeroDataBox API key (optional, for flight lookup)
+        if: ${{ env.HAS_AERODATABOX_KEY == 'true' }}
+        env:
+          AERODATABOX_API_KEY: ${{ secrets.AERODATABOX_API_KEY }}
+        run: echo "$AERODATABOX_API_KEY" | npx wrangler secret put AERODATABOX_API_KEY

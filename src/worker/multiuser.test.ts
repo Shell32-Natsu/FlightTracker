@@ -117,6 +117,6 @@ describe("多用户", () => {
   });
 
   it("/me 返回当前用户", async () => {
-    expect(await (await api("bob", "/me")).json()).toEqual({ email: "bob@localhost" });
+    expect(await (await api("bob", "/me")).json()).toEqual({ email: "bob@localhost", lookup: false });
   });
 });

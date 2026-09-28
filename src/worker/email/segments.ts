@@ -22,6 +22,13 @@ export interface ExtractedSegment {
   cancelled: boolean;
   /** 识别过程中的提示（如时间格式认不出），写进航班备注 */
   notes?: string[];
+  /** 航班数据服务查到的补充信息（配置了 AERODATABOX_API_KEY 时） */
+  lookup?: {
+    aircraftType: string | null;
+    registration: string | null;
+    schedDepUtc: string | null;
+    schedArrUtc: string | null;
+  } | null;
 }
 
 /** 舱位名称（各种写法）→ 四个舱位之一。 */

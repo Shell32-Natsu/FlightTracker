@@ -182,6 +182,37 @@ export async function demoFetch(path: string, init: RequestInit): Promise<Respon
   const parts = url.pathname.split("/").filter(Boolean); // ["flights", id?, "confirm"?]
   const body = init.body ? (JSON.parse(String(init.body)) as FlightInput) : null;
 
+  if (parts[0] === "me") return json({ email: "demo@example.com", lookup: true });
+  if (parts[0] === "lookup") {
+    // 演示版没有航班数据服务：用演示数据里同航班号的一段，平移到查询的日期
+    const code = (url.searchParams.get("flight") ?? "").toUpperCase().replace(/\s+/g, "");
+    const date = url.searchParams.get("date") ?? "";
+    const same = flights.find((f) => `${f.airline}${f.flightNumber}` === code);
+    if (!same || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return json({ candidates: [], cached: false });
+    const shift = (utc: string | null) =>
+      utc ? new Date(Date.parse(utc) + (Date.parse(date) - Date.parse(same.flightDate))).toISOString().replace(/\.\d{3}Z$/, "Z") : null;
+    const past = date < new Date().toISOString().slice(0, 10);
+    return json({
+      cached: false,
+      candidates: [
+        {
+          airline: same.airline,
+          flightNumber: same.flightNumber,
+          operatingAirline: null,
+          depAirport: same.depAirport,
+          arrAirport: same.arrAirport,
+          schedDepUtc: shift(same.schedDepUtc),
+          schedArrUtc: shift(same.schedArrUtc),
+          actualDepUtc: past ? shift(same.schedDepUtc) : null,
+          actualArrUtc: past ? shift(same.schedArrUtc) : null,
+          aircraftModel: same.aircraftType,
+          aircraftType: same.aircraftType,
+          registration: same.registration ?? null,
+          status: past ? "Arrived" : "Expected",
+        },
+      ],
+    });
+  }
   if (parts[0] === "aircraft-info" && parts[1]) {
     // 演示版没有后端：浏览器直接请求维基百科（它允许跨域）
     const { aircraftFamily } = await import("../../shared/aircraft");

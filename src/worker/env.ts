@@ -13,6 +13,8 @@ export interface Env {
   INBOUND_EMAIL?: string;
   /** Workers AI：识别没有结构化数据的邮件（免费额度内） */
   AI?: Ai;
+  /** 可选：AeroDataBox（RapidAPI）的 key，用于按航班号补全时刻、机型、机尾号（wrangler secret） */
+  AERODATABOX_API_KEY?: string;
   /** 可选：配置后改用 Claude 识别（wrangler secret） */
   ANTHROPIC_API_KEY?: string;
   /** 本地开发时设为 "true" 跳过 Access 校验（只写在 .dev.vars 里） */

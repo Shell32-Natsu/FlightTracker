@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { EmailRecord, Flight, FlightInput, FlightStatus, InboxInfo } from "../../shared/types";
+import type { EmailRecord, Flight, FlightInput, FlightStatus, InboxInfo, LookupResult } from "../../shared/types";
 import { DEFAULT_SETTINGS, type Settings } from "../../shared/settings";
 
 export class ApiError extends Error {
@@ -159,6 +159,20 @@ export function useAircraftInfo(type: string | undefined) {
     staleTime: Infinity,
     retry: false,
   });
+}
+
+/** 当前用户和服务端可用的功能 */
+export function useMe() {
+  return useQuery({
+    queryKey: ["me"],
+    queryFn: () => request<{ email: string; lookup: boolean }>("/me"),
+    staleTime: Infinity,
+  });
+}
+
+/** 按航班号 + 起飞当地日期查时刻、机型、机尾号 */
+export function lookupFlight(flight: string, date: string) {
+  return request<LookupResult>(`/lookup?flight=${encodeURIComponent(flight)}&date=${date}`);
 }
 
 export function useInbox() {

@@ -14,6 +14,7 @@ import { segmentsFromJsonLd } from "./jsonld";
 import { extractWithClaude } from "./llm";
 import { ExtractionError } from "./prompt";
 import { extractWithWorkersAi } from "./workersAi";
+import { lookupFlight, pickCandidate } from "../lookup/service";
 import { normalizeSeat, type ExtractedSegment } from "./segments";
 
 /**
@@ -159,6 +160,7 @@ export async function processEmail(
       });
       return "ignored";
     }
+    await enrichSegments(env, segments);
     const count = await applySegments(env.DB, userId, email.id, segments);
     await finish({ parseStatus: "parsed", parseMethod: method, error: null, flightCount: count });
     return "parsed";
@@ -213,6 +215,35 @@ export function resolveArrivalUtc(
   return best?.utc ?? null;
 }
 
+/**
+ * 用航班数据服务补机型、机尾号，以及邮件里缺的时刻。没配置 key 时什么都不做；
+ * 查询失败（额度用完、服务出错）不影响导入。
+ */
+export async function enrichSegments(
+  env: Pick<Env, "DB" | "AERODATABOX_API_KEY">,
+  segments: ExtractedSegment[],
+  fetcher: typeof fetch = fetch,
+): Promise<void> {
+  if (!env.AERODATABOX_API_KEY) return;
+  for (const seg of segments) {
+    if (seg.cancelled) continue;
+    try {
+      const result = await lookupFlight(env, seg.airline, seg.flightNumber, seg.depDate, fetcher);
+      const c = result && pickCandidate(result.candidates, seg.depAirport, seg.arrAirport);
+      if (c) {
+        seg.lookup = {
+          aircraftType: c.aircraftType,
+          registration: c.registration,
+          schedDepUtc: c.schedDepUtc,
+          schedArrUtc: c.schedArrUtc,
+        };
+      }
+    } catch (err) {
+      console.warn("lookup failed", seg.airline, seg.flightNumber, seg.depDate, err);
+    }
+  }
+}
+
 /** 航段 → 航班表需要的字段（当地时间按机场时区换成 UTC）。 */
 function toFlightFields(seg: ExtractedSegment) {
   const dep = findAirport(seg.depAirport);
@@ -221,15 +252,20 @@ function toFlightFields(seg: ExtractedSegment) {
   if (!arr) throw new ExtractionError(`机场表里没有到达机场 ${seg.arrAirport}`);
   const depUtc = seg.depTime ? localToUtc(seg.depDate, seg.depTime, dep.tz) : null;
   const km = greatCircleKm(dep.lat, dep.lon, arr.lat, arr.lon);
-  const arrUtc = resolveArrivalUtc(seg, depUtc, arr, km);
+  const emailArrUtc = resolveArrivalUtc(seg, depUtc, arr, km);
+  // 邮件里的时刻优先；缺的（或对不上的）用航班数据服务查到的
+  const schedDepUtc = depUtc ?? seg.lookup?.schedDepUtc ?? null;
+  const arrUtc = emailArrUtc ?? seg.lookup?.schedArrUtc ?? null;
   return {
     flightDate: seg.depDate,
     airline: seg.airline,
     flightNumber: seg.flightNumber,
     depAirport: seg.depAirport,
     arrAirport: seg.arrAirport,
-    schedDepUtc: depUtc,
+    schedDepUtc,
     schedArrUtc: arrUtc,
+    aircraftType: seg.lookup?.aircraftType ?? null,
+    registration: seg.lookup?.registration ?? null,
     seat: normalizeSeat(seg.seat),
     cabin: seg.cabin,
     confirmationCode: seg.confirmationCode,
@@ -322,9 +358,24 @@ export async function applySegments(
         seat: values.seat ?? existing.seat,
         cabin: values.cabin ?? existing.cabin,
         confirmationCode: values.confirmationCode ?? existing.confirmationCode,
+        aircraftType: existing.aircraftType ?? values.aircraftType ?? null,
+        registration: existing.registration ?? values.registration ?? null,
       };
       const keys = ["arrAirport", "schedDepUtc", "schedArrUtc", "seat", "cabin", "confirmationCode"] as const;
-      if (keys.every((k) => merged[k] === existing[k])) continue;
+      if (keys.every((k) => merged[k] === existing[k])) {
+        // 邮件内容没变，只是查到了原来缺的机型、机尾号：直接补上，不打扰
+        const fill = {
+          aircraftType: existing.aircraftType ?? values.aircraftType ?? null,
+          registration: existing.registration ?? values.registration ?? null,
+        };
+        if (fill.aircraftType !== existing.aircraftType || fill.registration !== existing.registration) {
+          await db
+            .update(flights)
+            .set({ ...fill, updatedAt: now })
+            .where(eq(flights.id, existing.id));
+        }
+        continue;
+      }
       const { status: _s, ...derived } = withDerived({
         ...merged,
         status: "pending",
