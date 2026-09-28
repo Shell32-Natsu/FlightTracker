@@ -66,8 +66,16 @@ afterAll(async () => {
 });
 
 describe("多用户", () => {
-  it("迁移前的数据由第一个登录的用户认领", async () => {
-    const res = await api("alice", "/flights");
+  it("迁移前的数据由第一个登录的用户认领：页面加载时的并发请求都能读到", async () => {
+    // 模拟上一次认领没完成：用户记录已经在了，数据还挂在 legacy 下
+    await env.DB.prepare("INSERT INTO users (id, email) VALUES ('dev:alice', 'alice@localhost')").run();
+    const [res, pending, settingsRes] = await Promise.all([
+      api("alice", "/flights"),
+      api("alice", "/flights?status=pending"),
+      api("alice", "/settings"),
+    ]);
+    expect(pending.status).toBe(200);
+    expect(((await settingsRes.json()) as { homeAirport: string | null }).homeAirport).toBe("PEK");
     const rows = (await res.json()) as { id: string; userId?: string }[];
     expect(rows.map((r) => r.id)).toEqual(["old1"]);
     // 返回给前端的数据不带 user_id
