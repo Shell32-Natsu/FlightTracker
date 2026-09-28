@@ -14,7 +14,7 @@ import { segmentsFromJsonLd } from "./jsonld";
 import { extractWithClaude } from "./llm";
 import { ExtractionError } from "./prompt";
 import { extractWithWorkersAi } from "./workersAi";
-import { lookupFlight, pickCandidate } from "../lookup/service";
+import { inLookupRange, lookupFlight, pickCandidate } from "../lookup/service";
 import { normalizeSeat, type ExtractedSegment } from "./segments";
 
 /**
@@ -226,7 +226,7 @@ export async function enrichSegments(
 ): Promise<void> {
   if (!env.AERODATABOX_API_KEY) return;
   for (const seg of segments) {
-    if (seg.cancelled) continue;
+    if (seg.cancelled || !inLookupRange(seg.depDate)) continue;
     try {
       const result = await lookupFlight(env, seg.airline, seg.flightNumber, seg.depDate, fetcher);
       const c = result && pickCandidate(result.candidates, seg.depAirport, seg.arrAirport);

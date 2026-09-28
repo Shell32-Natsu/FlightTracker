@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { normalizeFlights, toUtcIso } from "./lookup/aerodatabox";
-import { cacheFresh, lookupFlight, pickCandidate } from "./lookup/service";
+import { cacheFresh, inLookupRange, lookupFlight, pickCandidate } from "./lookup/service";
 import { applySegments, enrichSegments } from "./email/ingest";
 import type { ExtractedSegment } from "./email/segments";
 import { apiAs, migrate, MIGRATIONS, startDb } from "./testing";
@@ -76,13 +76,24 @@ describe("AeroDataBox 结果整理", () => {
     expect(pickCandidate(legs, null, null)).toBeNull();
   });
 
-  it("缓存：两天前的航班一直有效，最近的有结果 6 小时、没结果 1 小时", () => {
+  it("缓存：两天前的航班用到 7 天保留期满，最近的有结果 6 小时、没结果 1 小时", () => {
     const now = Date.parse("2026-09-28T12:00:00Z");
-    expect(cacheFresh("2024-05-01", "2025-01-01T00:00:00Z", false, now)).toBe(true);
+    expect(cacheFresh("2026-05-01", "2026-09-22T00:00:00Z", false, now)).toBe(true);
+    // AeroDataBox 条款：缓存最多保留 7 天
+    expect(cacheFresh("2026-05-01", "2026-09-21T11:00:00Z", false, now)).toBe(false);
     expect(cacheFresh("2026-09-28", "2026-09-28T08:00:00Z", false, now)).toBe(true);
     expect(cacheFresh("2026-09-28", "2026-09-28T05:00:00Z", false, now)).toBe(false);
     expect(cacheFresh("2026-10-05", "2026-09-28T11:30:00Z", true, now)).toBe(true);
     expect(cacheFresh("2026-10-05", "2026-09-28T10:30:00Z", true, now)).toBe(false);
+  });
+
+  it("只查前后一年内的航班", () => {
+    const now = Date.parse("2026-09-28T12:00:00Z");
+    expect(inLookupRange("2025-10-01", now)).toBe(true);
+    expect(inLookupRange("2027-09-20", now)).toBe(true);
+    expect(inLookupRange("2025-09-01", now)).toBe(false);
+    expect(inLookupRange("2027-10-30", now)).toBe(false);
+    expect(inLookupRange("bad", now)).toBe(false);
   });
 });
 
@@ -94,8 +105,14 @@ describe("查询接口和邮件补全", () => {
     proxy = await startDb();
     DB = proxy.env.DB;
     for (const m of MIGRATIONS) await migrate(DB, m);
+    // 固定“今天”，让 2024 年的样例数据落在可查询的一年内（只改 Date，不影响定时器）
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2024-06-01T00:00:00Z"));
   });
-  afterAll(() => proxy.dispose());
+  afterAll(() => {
+    vi.useRealTimers();
+    return proxy.dispose();
+  });
   afterEach(() => vi.unstubAllGlobals());
 
   it("没配置 key：接口 503、/me 标明不可用", async () => {
@@ -129,16 +146,34 @@ describe("查询接口和邮件补全", () => {
   it("额度用完、key 无效时给出能看懂的错误", async () => {
     const api = apiAs({ DB, AERODATABOX_API_KEY: "k" });
     vi.stubGlobal("fetch", fakeFetch({}, 429));
-    const r = await api("a", "/lookup?flight=CA981&date=2026-12-01");
+    const r = await api("a", "/lookup?flight=CA981&date=2024-07-01");
     expect(r.status).toBe(429);
     expect(((await r.json()) as { error: string }).error).toContain("额度");
     vi.stubGlobal("fetch", fakeFetch({}, 403));
-    expect((await api("a", "/lookup?flight=CA982&date=2026-12-01")).status).toBe(503);
+    expect((await api("a", "/lookup?flight=CA982&date=2024-07-01")).status).toBe(503);
+  });
+
+  it("超出一年范围：直接提示，不调接口", async () => {
+    const f = fakeFetch(UA857);
+    vi.stubGlobal("fetch", f);
+    const r = await apiAs({ DB, AERODATABOX_API_KEY: "k" })("a", "/lookup?flight=UA857&date=2019-05-01");
+    expect(r.status).toBe(422);
+    expect(((await r.json()) as { error: string }).error).toContain("一年");
+    expect(f).not.toHaveBeenCalled();
+  });
+
+  it("写新缓存时清掉超过 7 天的旧缓存", async () => {
+    await DB.prepare(
+      "INSERT INTO lookup_cache (key, response_json, fetched_at) VALUES ('OLD1:2024-05-10', '{\"flights\":[]}', '2024-05-20T00:00:00Z')",
+    ).run();
+    await lookupFlight({ DB, AERODATABOX_API_KEY: "k" }, "MU", "5101", "2024-06-03", fakeFetch([]));
+    const old = await DB.prepare("SELECT key FROM lookup_cache WHERE key = 'OLD1:2024-05-10'").first();
+    expect(old).toBeNull();
   });
 
   it("查不到（204）返回空列表", async () => {
     const f = fakeFetch(null, 204);
-    const r = await lookupFlight({ DB, AERODATABOX_API_KEY: "k" }, "ZZ", "1", "2026-12-02", f);
+    const r = await lookupFlight({ DB, AERODATABOX_API_KEY: "k" }, "ZZ", "1", "2024-07-02", f);
     expect(r).toEqual({ candidates: [], cached: false });
   });
 

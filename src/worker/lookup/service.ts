@@ -1,20 +1,34 @@
-import { eq } from "drizzle-orm";
+import { eq, lt } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { lookupCache } from "../db/schema";
 import type { Env } from "../env";
-import { fetchAeroDataBox, normalizeFlights, type LookupCandidate } from "./aerodatabox";
+import { fetchAeroDataBox, LookupError, normalizeFlights, type LookupCandidate } from "./aerodatabox";
 
 const HOUR = 3600_000;
+const DAY = 24 * HOUR;
+
+/** AeroDataBox 使用条款：缓存的数据最多保留 7 天 */
+export const CACHE_RETENTION_DAYS = 7;
+/** 免费套餐只能查前后一年内的航班 */
+export const LOOKUP_RANGE_DAYS = 365;
 
 /**
- * 缓存是否还能用：起飞日期两天以前的航班不会再变，查到时已经是这样的就一直用；
+ * 缓存是否还能用（都不超过 7 天的保留期）：起飞日期两天以前的航班不会再变，一直用到保留期满；
  * 最近和未来的航班时刻、机型还可能变，有结果的缓存 6 小时，查不到的 1 小时。
  */
 export function cacheFresh(date: string, fetchedAt: string, empty: boolean, now = Date.now()): boolean {
   const day = Date.parse(`${date}T00:00:00Z`);
   const fetched = Date.parse(fetchedAt);
-  if (day < fetched - 2 * 24 * HOUR) return true;
-  return now - fetched < (empty ? 1 : 6) * HOUR;
+  const age = now - fetched;
+  if (age >= CACHE_RETENTION_DAYS * DAY) return false;
+  if (day < fetched - 2 * DAY) return true;
+  return age < (empty ? 1 : 6) * HOUR;
+}
+
+/** 日期在不在可查询的范围（今天前后一年）里 */
+export function inLookupRange(date: string, now = Date.now()): boolean {
+  const day = Date.parse(`${date}T00:00:00Z`);
+  return Number.isFinite(day) && Math.abs(day - now) <= LOOKUP_RANGE_DAYS * DAY;
 }
 
 /**
@@ -30,6 +44,9 @@ export async function lookupFlight(
 ): Promise<{ candidates: LookupCandidate[]; cached: boolean } | null> {
   const key = env.AERODATABOX_API_KEY;
   if (!key) return null;
+  if (!inLookupRange(date)) {
+    throw new LookupError(`航班数据服务只能查一年以内的航班（前后 ${LOOKUP_RANGE_DAYS} 天）`, 422);
+  }
   const flight = `${airline}${flightNumber}`;
   const cacheKey = `${flight}:${date}`;
   const db = drizzle(env.DB);
@@ -44,6 +61,9 @@ export async function lookupFlight(
   }
 
   const raw = await fetchAeroDataBox(key, flight, date, fetcher);
+  // 顺手清掉超过保留期的缓存
+  const expired = new Date(Date.now() - CACHE_RETENTION_DAYS * DAY).toISOString();
+  await db.delete(lookupCache).where(lt(lookupCache.fetchedAt, expired));
   const row = { key: cacheKey, responseJson: JSON.stringify({ flights: raw }), fetchedAt: new Date().toISOString() };
   await db
     .insert(lookupCache)

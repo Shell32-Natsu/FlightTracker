@@ -1946,6 +1946,15 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   flex-basis: 100%;
 }
 
+.lookup-credit {
+  font-size: 0.72rem;
+  color: var(--text-3);
+}
+
+.lookup-credit a {
+  color: inherit;
+}
+
 .route-inputs {
   grid-column: 1 / -1;
   position: relative;

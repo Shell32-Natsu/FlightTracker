@@ -34,7 +34,7 @@ export interface RawFlight {
 export class LookupError extends Error {
   constructor(
     message: string,
-    readonly status: 429 | 502 | 503,
+    readonly status: 422 | 429 | 502 | 503,
   ) {
     super(message);
   }

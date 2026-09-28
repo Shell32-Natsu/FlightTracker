@@ -259,8 +259,14 @@ function FlightForm({ refData, flight }: { refData: RefData; flight?: Flight }) 
                   ) : lookup?.kind === "choose" ? (
                     <span className="lookup-status">这个航班号当天有多段，选一段：</span>
                   ) : (
-                    <span className="lookup-status faint">按航班号和日期自动填航线、时间、机型和机尾号</span>
+                    <span className="lookup-status faint">按航班号和日期自动填航线、时间、机型和机尾号（一年以内的航班）</span>
                   )}
+                  <small className="lookup-credit">
+                    航班数据来自{" "}
+                    <a href="https://aerodatabox.com/" target="_blank" rel="noreferrer">
+                      AeroDataBox
+                    </a>
+                  </small>
                   {lookup?.kind === "choose" && (
                     <div className="chips wrap lookup-choices">
                       {lookup.candidates.map((c, i) => (

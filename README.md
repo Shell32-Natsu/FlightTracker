@@ -146,7 +146,9 @@ git checkout wrangler.jsonc   # 脚本改动只用于这次部署，不要提交
 按航班号 + 起飞当地日期查航线、计划 / 实际时间、机型和机尾号，数据来自 [AeroDataBox](https://aerodatabox.com/)（RapidAPI）。
 
 - **在哪里用**：添加 / 编辑航班页的“查询航班信息”按钮；邮件导入时自动补机型、机尾号和邮件里缺的时刻（查不到或额度用完时照常导入）。
-- **缓存**：`lookup_cache` 表，所有用户共用。起飞两天以前的航班永久缓存；最近和未来的有结果缓存 6 小时、查不到缓存 1 小时。
+- **范围**：免费 Basic 套餐只能查前后 365 天内的航班，超出范围的直接提示、不调接口；每月 400 个 API 单位。
+- **缓存**：`lookup_cache` 表，所有用户共用。按 AeroDataBox 的使用条款最多保留 7 天，过期的在写新缓存时删除；起飞两天以前的航班在保留期内一直用缓存，最近和未来的有结果缓存 6 小时、查不到缓存 1 小时。
+- **署名**：条款要求注明数据来源，查询按钮旁写有“航班数据来自 AeroDataBox”。
 - **配置**：在 [RapidAPI 的 AeroDataBox 页面](https://rapidapi.com/aedbx-aedbx/api/aerodatabox) 订阅免费的 Basic 套餐，把 key 存成 GitHub 仓库的 secret `AERODATABOX_API_KEY`，重新部署即可（本地开发写进 `.dev.vars`）。没配置时查询按钮不显示，其他功能不受影响。
 
 ## 航司徽标与机型
