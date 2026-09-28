@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { checkSender, normalizeAddress } from "./auth";
 import { htmlToText } from "./html";
 import { segmentsFromJsonLd } from "./jsonld";
-import { cabinFromName, splitFlightNumber } from "./segments";
+import { cabinFromName, normalizeSeat, splitFlightNumber } from "./segments";
 import { JSONLD_HTML } from "./fixtures";
 
 describe("JSON-LD FlightReservation", () => {
@@ -46,6 +46,14 @@ describe("工具函数", () => {
     expect(splitFlightNumber("3U 8888", null)).toEqual({ airline: "3U", number: "8888" });
     expect(splitFlightNumber("B6 1234", null)).toEqual({ airline: "B6", number: "1234" });
     expect(splitFlightNumber("hello", null)).toBeNull();
+  });
+
+  it("座位号：只接受“排号 + 字母”，说明文字丢掉", () => {
+    expect(normalizeSeat("32a")).toBe("32A");
+    expect(normalizeSeat(" 9 K ")).toBe("9K");
+    expect(normalizeSeat("CHECK-IN REQUIRED")).toBeNull();
+    expect(normalizeSeat("Seat selection at check-in")).toBeNull();
+    expect(normalizeSeat(null)).toBeNull();
   });
 
   it("舱位名称归类", () => {

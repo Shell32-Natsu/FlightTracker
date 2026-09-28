@@ -47,3 +47,12 @@ export function splitFlightNumber(
   if (!m) return null;
   return { airline: m[1] ?? airline, number: m[2] };
 }
+
+/**
+ * 座位号：排号 + 字母，如 "32A"、"9 K"。邮件里常见的 “CHECK-IN REQUIRED”
+ * “Seat selection at check-in” 之类的说明不是座位，返回 null。
+ */
+export function normalizeSeat(raw: string | null | undefined): string | null {
+  const s = (raw ?? "").toUpperCase().replace(/\s+/g, "");
+  return /^\d{1,3}[A-L]$/.test(s) ? s : null;
+}

@@ -14,7 +14,7 @@ import { segmentsFromJsonLd } from "./jsonld";
 import { extractWithClaude } from "./llm";
 import { ExtractionError } from "./prompt";
 import { extractWithWorkersAi } from "./workersAi";
-import type { ExtractedSegment } from "./segments";
+import { normalizeSeat, type ExtractedSegment } from "./segments";
 
 /**
  * 邮件导入：收件地址认出用户 → 校验发件人 → 存邮件 → 提取航段 → 写成“待确认”航班。
@@ -230,7 +230,7 @@ function toFlightFields(seg: ExtractedSegment) {
     arrAirport: seg.arrAirport,
     schedDepUtc: depUtc,
     schedArrUtc: arrUtc,
-    seat: seg.seat,
+    seat: normalizeSeat(seg.seat),
     cabin: seg.cabin,
     confirmationCode: seg.confirmationCode,
     notes:
