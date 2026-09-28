@@ -278,7 +278,54 @@ export const FlightMap = forwardRef<FlightMapHandle, Props>(function FlightMap(
       setReady(true);
     });
 
+    // 画布尺寸和容器对不上时，地球会按错误的宽高比画成椭圆、机场标签也会错位。
+    // MapLibre 的竞态：地球投影下样式加载完成时只按容器尺寸更新相机、不更新画布；
+    // 如果建图到样式加载之间容器变了（手机地址栏伸缩），随后 ResizeObserver 的首次回调
+    // 看到容器和相机一致就跳过，画布就一直停在旧尺寸。加载完成、每次静止、回到前台、
+    // 视口变化和 WebGL 上下文恢复时都核对一次，对不上就重新 resize。
+    const syncSize = () => {
+      const el = map.getContainer();
+      const canvas = map.getCanvas();
+      const w = el.clientWidth;
+      const h = el.clientHeight;
+      if (!w || !h || !canvas.width || !canvas.height) return;
+      const stretched =
+        Math.abs(canvas.clientWidth - w) > 1 ||
+        Math.abs(canvas.clientHeight - h) > 1 ||
+        Math.abs(canvas.width / canvas.height - w / h) > 0.01;
+      if (stretched) map.resize();
+    };
+    // 视口（尤其是 iOS 地址栏）稳定下来需要一点时间
+    const timers = new Set<number>();
+    const syncSoon = () => {
+      if (document.visibilityState === "hidden") return;
+      requestAnimationFrame(syncSize);
+      for (const ms of [250, 800]) {
+        const t = window.setTimeout(() => {
+          timers.delete(t);
+          syncSize();
+        }, ms);
+        timers.add(t);
+      }
+    };
+    const viewport = window.visualViewport;
+    document.addEventListener("visibilitychange", syncSoon);
+    window.addEventListener("pageshow", syncSoon);
+    window.addEventListener("orientationchange", syncSoon);
+    window.addEventListener("resize", syncSoon);
+    viewport?.addEventListener("resize", syncSoon);
+    map.on("webglcontextrestored", syncSoon);
+    map.once("load", syncSoon);
+    map.on("idle", syncSize);
+
     return () => {
+      document.removeEventListener("visibilitychange", syncSoon);
+      window.removeEventListener("pageshow", syncSoon);
+      window.removeEventListener("orientationchange", syncSoon);
+      window.removeEventListener("resize", syncSoon);
+      viewport?.removeEventListener("resize", syncSoon);
+      map.off("idle", syncSize);
+      for (const t of timers) clearTimeout(t);
       map.remove();
       mapRef.current = null;
     };
