@@ -30,9 +30,9 @@ export interface Timeline {
 
 export const TIMING = {
   intro: 3.2,
-  /** 每段航程按距离缩放，限制在 2–6 秒 */
+  /** 每段航程按距离缩放，限制在 2.5–6 秒 */
   kmPerSecond: 1800,
-  cruiseMin: 2,
+  cruiseMin: 2.5,
   cruiseMax: 6,
   /** 起飞前、降落后的推拉镜头 */
   approach: 1,
@@ -102,8 +102,11 @@ export const CAMERA = {
   pullOut: 1.8,
   pushIn: 1.8,
   minHold: 0.6,
-  /** 镜头略微领先飞机（航程比例） */
-  lead: 0.06,
+  /**
+   * 飞行时镜头始终以飞机为中心；拉远时比“整段居中入画”再远一些（固定倍数，
+   * 不随飞机位置变化，避免巡航中来回缩放），让飞机在航段前后段时两端也基本在画面内
+   */
+  followWiden: 0.65,
   /** 片尾卡片期间继续缓缓拉远 */
   outroDrift: 0.9,
 };
@@ -191,14 +194,12 @@ export function frameAt(tl: Timeline, legs: Leg[], scales: Scales, t: number): F
       const cam = legCamera(u, legDuration(leg.km));
       const route = geoInterpolate(leg.dep, leg.arr);
       const progress = cam.progress;
-      // 镜头看向飞机前方一点，拉远时逐渐移到航线中点
-      const lookAt = route(Math.min(1, progress + CAMERA.lead * cam.zoomOut)) as LonLat;
-      const mid = route(0.5) as LonLat;
+      const far = Math.max(scales.overview, scales.leg[seg.leg] * CAMERA.followWiden);
       return {
         ...base,
-        // 平方：镜头拉得够远之后才移向中点，刚起飞时飞机不会被甩到画面边缘
-        center: geoInterpolate(lookAt, mid)(cam.zoomOut ** 2) as LonLat,
-        scale: logLerp(scales.near, scales.leg[seg.leg], cam.zoomOut),
+        // 镜头始终以飞机为中心
+        center: route(progress) as LonLat,
+        scale: logLerp(scales.near, far, cam.zoomOut),
         leg: seg.leg,
         progress,
         flying: progress > 0 && progress < 1,

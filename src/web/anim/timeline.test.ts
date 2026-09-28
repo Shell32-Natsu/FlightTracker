@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { geoInterpolate } from "d3-geo";
 import { buildTimeline, CAMERA, frameAt, legDuration, TIMING, type Leg, type Scales } from "./timeline";
 import { groupTrips, tripPath } from "./trips";
 import type { Flight } from "../../shared/types";
@@ -14,10 +15,10 @@ const legs: Leg[] = [
 const scales: Scales = { near: 4000, leg: [1200, 900, 700], overview: 500, overviewCenter: [130, 0] };
 
 describe("时间轴", () => {
-  it("航段时长按距离缩放，限制在 2–6 秒巡航", () => {
+  it("航段时长按距离缩放，限制在 2.5–6 秒巡航", () => {
     expect(legDuration(100)).toBe(TIMING.approach * 2 + TIMING.cruiseMin);
     expect(legDuration(1e6)).toBe(TIMING.approach * 2 + TIMING.cruiseMax);
-    expect(legDuration(3600)).toBeCloseTo(TIMING.approach * 2 + 2);
+    expect(legDuration(5400)).toBeCloseTo(TIMING.approach * 2 + 3);
   });
 
   it("同机场转机 0.5 秒；不衔接的航段镜头飞过去", () => {
@@ -58,8 +59,15 @@ describe("镜头", () => {
   it("航段：起飞近景 → 中途拉远看全程 → 降落近景，飞机单调前进", () => {
     const at = (u: number) => frameAt(tl, legs, scales, leg0.start + (leg0.end - leg0.start) * u);
     expect(at(0).scale).toBeCloseTo(scales.near, 0);
-    // 中途拉远到整段入画
-    expect(at(0.5).scale).toBeCloseTo(scales.leg[0], 6);
+    // 中途拉远（以飞机为中心，比整段入画再远一些）
+    expect(at(0.5).scale).toBeCloseTo(Math.max(scales.overview, scales.leg[0] * CAMERA.followWiden), 6);
+    // 飞行全程镜头中心就是飞机位置
+    for (const uu of [0.1, 0.3, 0.5, 0.7, 0.9]) {
+      const f = at(uu);
+      const plane = geoInterpolate(legs[0].dep, legs[0].arr)(f.progress);
+      expect(f.center[0]).toBeCloseTo(plane[0], 6);
+      expect(f.center[1]).toBeCloseTo(plane[1], 6);
+    }
     // 只缩放一次：先单调拉远，再单调推近，不会在机场附近来回推拉
     let dir = -1;
     let turns = 0;
