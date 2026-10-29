@@ -13,6 +13,16 @@ import { cachedTheme } from "../lib/theme";
 import { buildPosterData, type ColorBy } from "../poster/data";
 import { TEMPLATES, TEMPLATE_COMPONENTS, type TemplateId } from "../poster/templates";
 import { saveImage, svgToPng } from "../poster/exportPng";
+import { usePrivateMode } from "../poster/privacy";
+
+/** 各模板在隐私模式下会隐藏什么 */
+const PRIVATE_HINT: Record<TemplateId, string> = {
+  card: "不显示航班号、日期（只留年份）、起降时刻和座位",
+  passport: "不印持有人姓名，首次飞行只写年份",
+  year: "这个模板本身不含航班号和具体日期",
+  overview: "这个模板本身不含航班号和具体日期",
+  wallpaper: "这个模板本身不含航班号和具体日期",
+};
 
 const SCALE = 3;
 
@@ -37,6 +47,7 @@ export function PosterPage() {
       return "";
     }
   });
+  const [hidePrivate, setHidePrivate] = usePrivateMode();
   const [rotation, setRotation] = useState<[number, number] | null>(null);
   const [status, setStatus] = useState<{ kind: "busy" | "done" | "error"; text: string } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -94,7 +105,9 @@ export function PosterPage() {
       const blob = await svgToPng(svgRef.current, SCALE);
       const name =
         template === "card" && flight
-          ? `hangji-${flight.airline}${flight.flightNumber}-${flight.flightDate}.png`
+          ? hidePrivate
+            ? `hangji-card-${flight.depAirport}-${flight.arrAirport}.png`
+            : `hangji-${flight.airline}${flight.flightNumber}-${flight.flightDate}.png`
           : `hangji-${template}-${template === "year" ? activeYear : scope}.png`;
       const how = await saveImage(blob, name);
       setStatus({
@@ -223,6 +236,7 @@ export function PosterPage() {
                 value={holder}
                 maxLength={32}
                 autoComplete="off"
+                disabled={hidePrivate}
                 onChange={(e) => {
                   setHolder(e.target.value);
                   try {
@@ -232,6 +246,7 @@ export function PosterPage() {
                   }
                 }}
               />
+              {hidePrivate && <small className="control-hint">已打开隐藏隐私信息，机读区不印名字</small>}
             </div>
           )}
 
@@ -251,6 +266,15 @@ export function PosterPage() {
               {effectiveColorBy === "airline" && <small className="control-hint">前 3 家航司各一种颜色，其余为“其他”</small>}
             </div>
           )}
+
+          <div className="control-group">
+            <span className="control-label">隐私</span>
+            <label className="check-row">
+              <input type="checkbox" checked={hidePrivate} onChange={(e) => setHidePrivate(e.target.checked)} />
+              隐藏隐私信息
+            </label>
+            {hidePrivate && <small className="control-hint">{PRIVATE_HINT[template]}</small>}
+          </div>
 
           <div className="poster-actions">
             <button className="button primary" onClick={() => void save()} disabled={status?.kind === "busy"}>
@@ -297,6 +321,7 @@ export function PosterPage() {
               flight={flight}
               rotation={rotation ?? undefined}
               holder={holder}
+              hidePrivate={hidePrivate}
             />
           </div>
           {template === "wallpaper" && (

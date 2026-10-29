@@ -172,10 +172,12 @@ export interface PassportProps {
   unit: DistanceUnit;
   year?: number;
   holder?: string;
+  /** 不印持有人姓名，首次飞行只写年份 */
+  hidePrivate?: boolean;
 }
 
 export const PassportPoster = forwardRef<SVGSVGElement, PassportProps>(function PassportPoster(
-  { data, palette, world, unit, year, holder },
+  { data, palette, world, unit, year, holder, hidePrivate },
   ref,
 ) {
   const { width: W, height: H } = PASSPORT_SIZE;
@@ -219,8 +221,9 @@ export const PassportPoster = forwardRef<SVGSVGElement, PassportProps>(function 
   const title = `${year ?? "ALL-TIME"} FLIGHT PASSPORT`;
   const home = data.home?.code ?? stats.airports[0]?.key ?? "---";
   const distance = Math.round(unit === "km" ? stats.distanceKm : kmToMiles(stats.distanceKm)).toLocaleString("en-US");
-  const name = mrzName(holder);
-  const mrz1 = mrzLine([`${year ?? "ALL"}<<`, `${name}<<`, `FIRST${passportDate(first).replace(/ /g, "")}`, "<<HANGJI"]);
+  const name = mrzName(hidePrivate ? undefined : holder);
+  const firstLabel = hidePrivate ? first.slice(0, 4) : passportDate(first);
+  const mrz1 = mrzLine([`${year ?? "ALL"}<<`, `${name}<<`, `FIRST${firstLabel.replace(/ /g, "")}`, "<<HANGJI"]);
   const mrz2 = mrzLine([`ISSUED${passportDate(today).replace(/ /g, "")}${home}`, `${stats.flights}FLIGHTS`]);
 
   // 下半张的机场代码底纹
@@ -414,7 +417,7 @@ export const PassportPoster = forwardRef<SVGSVGElement, PassportProps>(function 
         ["签发机构", "航迹"],
         ["签发地", home],
         ["签发日期", passportDate(today)],
-        ["首次飞行", passportDate(first)],
+        ["首次飞行", firstLabel],
       ].map(([k, v], i) => (
         <text key={k} x={470} y={862 + i * 50} fontSize={27}>
           <tspan fill={L.label}>{k}</tspan>

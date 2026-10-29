@@ -18,6 +18,7 @@ import type { RefData } from "../lib/refdata";
 import { airlineName, cityName, formatHours, type DistanceUnit } from "../lib/format";
 import type { PosterPalette } from "../poster/palettes";
 import { FONT } from "../poster/text";
+import { yearSpan } from "../poster/privacy";
 import { tripPath } from "./trips";
 import {
   buildTimeline,
@@ -46,6 +47,8 @@ export interface SceneOptions {
   unit: DistanceUnit;
   /** 片头标题，如 "2024 年度飞行"；缺省为旅行的日期 */
   title?: string;
+  /** 隐藏航班号和具体日期（只留年份） */
+  hidePrivate?: boolean;
 }
 
 export interface Scene {
@@ -217,6 +220,7 @@ export function createScene(o: SceneOptions): Scene {
   const ymd = (d: string) => d.split("-").map(Number);
   const dateRange = (() => {
     if (!first || !last) return "";
+    if (o.hidePrivate) return `${yearSpan(usable.map((f) => f.flightDate))}年`;
     const [y1, m1, d1] = ymd(first.flightDate);
     const [y2, m2, d2] = ymd(last.flightDate);
     const start = `${y1}年${m1}月${d1}日`;
@@ -224,19 +228,21 @@ export function createScene(o: SceneOptions): Scene {
     if (y1 !== y2) return `${start} – ${y2}年${m2}月${d2}日`;
     return m1 !== m2 ? `${start} – ${m2}月${d2}日` : `${start} – ${d2}日`;
   })();
-  const title = o.title ?? dateRange;
-  const subtitle = o.title ? dateRange : `${legs.length} 段航程`;
+  const title = o.title ?? (o.hidePrivate ? `${dateRange}的旅行` : dateRange);
+  // 年度标题里已经有年份，隐私模式下副标题不再重复
+  const subtitle = o.title && !o.hidePrivate ? dateRange : `${legs.length} 段航程`;
   const totalKm = legs.reduce((s, l) => s + l.km, 0);
   const totalMin = usable.reduce((s, f) => s + (f.durationMin ?? 0), 0);
   const airportSet = new Set(path);
   const countrySet = new Set(path.map((c) => ref.airports[c]?.country).filter(Boolean));
+  // 隐私模式：航班号的位置改写航司名，详情里不写日期
   const legInfo = usable.map((f) => ({
-    code: `${f.airline} ${f.flightNumber}`,
-    airline: airlineName(f.airline, ref),
+    code: o.hidePrivate ? airlineName(f.airline, ref) : `${f.airline} ${f.flightNumber}`,
+    airline: o.hidePrivate ? "" : airlineName(f.airline, ref),
     route: `${f.depAirport}  →  ${f.arrAirport}`,
     detail: [
       `${cityName(f.depAirport, ref)} → ${cityName(f.arrAirport, ref)}`,
-      `${ymd(f.flightDate)[1]}月${ymd(f.flightDate)[2]}日`,
+      o.hidePrivate ? null : `${ymd(f.flightDate)[1]}月${ymd(f.flightDate)[2]}日`,
       f.aircraftType ? (ref.aircraft[f.aircraftType] ?? f.aircraftType) : null,
     ]
       .filter(Boolean)

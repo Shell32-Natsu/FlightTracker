@@ -5,7 +5,7 @@ import { monthMatrix } from "../../shared/stats";
 import { formatDuration } from "../../shared/time";
 import { kmToMiles } from "../../shared/geo";
 import type { RefData } from "../lib/refdata";
-import { aircraftName, airlineName, cityName, formatDate, localTimes, type DistanceUnit } from "../lib/format";
+import { aircraftName, airlineName, CABIN_LABEL, cityName, formatDate, localTimes, type DistanceUnit } from "../lib/format";
 import { airlineHue } from "../ui/AirlineBadge";
 import type { PosterPalette } from "./palettes";
 import type { PosterData } from "./data";
@@ -46,6 +46,8 @@ export interface TemplateProps {
   rotation?: [number, number];
   /** 护照上的持有人姓名（机读区） */
   holder?: string;
+  /** 隐藏航班号、具体日期、时刻、座位和姓名 */
+  hidePrivate?: boolean;
 }
 
 const num = (n: number) => Math.round(n).toLocaleString("en-US");
@@ -292,7 +294,7 @@ export const OverviewPoster = forwardRef<SVGSVGElement, TemplateProps>(function 
 /* ------------------------------------------------------------------ 单次航班卡片 1:1 */
 
 export const FlightCard = forwardRef<SVGSVGElement, TemplateProps>(function FlightCard(
-  { data, palette: p, world, refData, unit, flight },
+  { data, palette: p, world, refData, unit, flight, hidePrivate },
   ref,
 ) {
   const spec = TEMPLATES.card;
@@ -309,7 +311,8 @@ export const FlightCard = forwardRef<SVGSVGElement, TemplateProps>(function Flig
   }
   const a = refData.airports[flight.depAirport];
   const b = refData.airports[flight.arrAirport];
-  const t = localTimes(flight, refData);
+  // 隐私模式：不画起降时刻，航班号换成航司名，日期只留年份，座位换成舱位
+  const t = hidePrivate ? { dep: null, arr: null, arrOffset: "" } : localTimes(flight, refData);
   const mid = a && b ? routeCenter([a.lon, a.lat], [b.lon, b.lat]) : ([0, 0] as [number, number]);
   // 视角中心略向南偏，让航线呈上拱的弧线；偏移量随航线长度增加
   const angle = a && b ? geoDistance([a.lon, a.lat], [b.lon, b.lat]) : 0;
@@ -320,7 +323,9 @@ export const FlightCard = forwardRef<SVGSVGElement, TemplateProps>(function Flig
     ["机型", flight.aircraftType ? aircraftName(flight.aircraftType, refData).replace(/^(Boeing|Airbus) /, "") : "—"],
     ["时长", flight.durationMin ? formatDuration(flight.durationMin) : "—"],
     ["距离", flight.distanceKm ? `${dist(flight.distanceKm, unit)} ${unit}` : "—"],
-    ["座位", flight.seat ?? "—"],
+    hidePrivate
+      ? ["舱位", flight.cabin ? CABIN_LABEL[flight.cabin] : "—"]
+      : ["座位", flight.seat ?? "—"],
   ];
   return (
     <Canvas ref={ref} spec={spec} p={p}>
@@ -363,16 +368,17 @@ export const FlightCard = forwardRef<SVGSVGElement, TemplateProps>(function Flig
           </>
         )}
         <text x={68} y={24} fontSize={24} fontWeight={800} fill={p.text}>
-          {flight.airline}
-          {flight.flightNumber}
+          {hidePrivate ? airlineName(flight.airline, refData) : `${flight.airline}${flight.flightNumber}`}
         </text>
         <text x={68} y={46} fontSize={15} fill={p.muted}>
-          {airlineName(flight.airline, refData)}
+          {hidePrivate ? `${flight.flightDate.slice(0, 4)} 年` : airlineName(flight.airline, refData)}
         </text>
       </g>
-      <text x={844} y={80} textAnchor="end" fontSize={18} fontWeight={600} fill={p.text}>
-        {formatDate(flight.flightDate)}
-      </text>
+      {!hidePrivate && (
+        <text x={844} y={80} textAnchor="end" fontSize={18} fontWeight={600} fill={p.text}>
+          {formatDate(flight.flightDate)}
+        </text>
+      )}
 
       <text x={56} y={660} fontSize={96} fontWeight={800} letterSpacing={-2} fill={p.text}>
         {flight.depAirport}

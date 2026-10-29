@@ -14,6 +14,7 @@ import { saveImage } from "../poster/exportPng";
 import { groupTrips, sortByDeparture } from "../anim/trips";
 import { createScene, loadSceneFonts, type ProjectionKind } from "../anim/renderer";
 import { encodeScene } from "../anim/encode";
+import { usePrivateMode } from "../poster/privacy";
 
 type Scope = "trip" | "year";
 type Aspect = "9:16" | "1:1" | "16:9";
@@ -56,6 +57,7 @@ export function AnimationPage() {
   const [speed, setSpeed] = useState<(typeof SPEEDS)[number]["value"]>("1");
   const [endCard, setEndCard] = useState(true);
   const [fps, setFps] = useState<"30" | "60">("60");
+  const [hidePrivate, setHidePrivate] = usePrivateMode();
   const [status, setStatus] = useState<Status>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -100,6 +102,7 @@ export function AnimationPage() {
       endCard,
       unit,
       title: scope === "year" ? `${activeYear} 年度飞行` : undefined,
+      hidePrivate,
     });
   }, [
     selected,
@@ -114,6 +117,7 @@ export function AnimationPage() {
     unit,
     scope,
     activeYear,
+    hidePrivate,
   ]);
 
   if (flights.error) return <ErrorBox error={flights.error} />;
@@ -149,7 +153,9 @@ export function AnimationPage() {
       const name =
         scope === "year"
           ? `hangji-${activeYear}.${res.ext}`
-          : `hangji-trip-${selected[0].flightDate}.${res.ext}`;
+          : hidePrivate
+            ? `hangji-trip-${selected[0].depAirport}-${selected[0].arrAirport}.${res.ext}`
+            : `hangji-trip-${selected[0].flightDate}.${res.ext}`;
       const how = await saveImage(res.blob, name);
       const mb = (res.blob.size / 1024 / 1024).toFixed(1);
       setStatus({
@@ -303,6 +309,15 @@ export function AnimationPage() {
               <input type="checkbox" checked={endCard} onChange={(e) => setEndCard(e.target.checked)} />
               片尾显示统计卡片
             </label>
+          </div>
+
+          <div className="control-group">
+            <span className="control-label">隐私</span>
+            <label className="check-row">
+              <input type="checkbox" checked={hidePrivate} onChange={(e) => setHidePrivate(e.target.checked)} />
+              隐藏隐私信息
+            </label>
+            {hidePrivate && <small className="control-hint">不显示航班号和具体日期，只留年份</small>}
           </div>
 
           <div className="poster-actions">
