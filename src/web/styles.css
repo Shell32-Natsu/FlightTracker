@@ -5212,3 +5212,54 @@ a.record-card:hover,
   font-family: var(--font);
   letter-spacing: 0;
 }
+
+/* 可以拖着转的 3D 飞机：画布铺满整张卡片，标题和涂装按钮浮在上面 */
+.aircraft-hero.with-3d {
+  grid-template-rows: auto 1fr auto;
+  min-height: clamp(380px, 46vw, 560px);
+}
+
+.aircraft-hero.with-3d > :not(.aircraft-3d) {
+  z-index: 1;
+}
+
+.aircraft-hero.with-3d .aircraft-hero-text {
+  pointer-events: none;
+}
+
+.aircraft-hero.with-3d .livery-picker {
+  grid-row: 3;
+  justify-self: start;
+  max-width: calc(100% - 120px);
+}
+
+.aircraft-hero.with-3d .aircraft-hero-art {
+  grid-row: 2;
+  align-self: center;
+}
+
+.aircraft-3d {
+  position: absolute;
+  inset: 0;
+  cursor: grab;
+}
+
+.aircraft-3d.dragging {
+  cursor: grabbing;
+}
+
+.aircraft-3d canvas {
+  display: block;
+}
+
+.aircraft-3d-hint {
+  position: absolute;
+  right: 22px;
+  bottom: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: rgb(255 255 255 / 0.62);
+  font-size: 0.8rem;
+  pointer-events: none;
+}

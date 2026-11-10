@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { useAircraftInfo, useFlights } from "../lib/api";
@@ -12,6 +12,17 @@ import { FlightTicket, ticketFromFlight } from "../ticket/FlightTicket";
 import { AirlineLogo } from "../ui/AirlineBadge";
 import { ErrorBox, Loading } from "../components/Status";
 
+// three.js 体积大，看机型页时才加载
+const Aircraft3D = lazy(() =>
+  import("../aircraft3d/Aircraft3D").catch(() => ({ default: Load3DFailed })),
+);
+
+/** 3D 代码没加载下来（断网、刚发过新版）：换回侧视图 */
+function Load3DFailed({ onFail }: { onFail: () => void }) {
+  useEffect(onFail, [onFail]);
+  return <></>;
+}
+
 /** 机型详情：带涂装的侧视图、你的数据、同系列、维基百科简介、坐过的航班。 */
 export function AircraftPage() {
   const { type = "" } = useParams();
@@ -21,11 +32,14 @@ export function AircraftPage() {
   const [unit] = useUnit();
   const info = useAircraftInfo(code);
   const [pick, setPick] = useState<string | null>(null);
+  const [no3D, setNo3D] = useState(false);
 
   const all = flights.data ?? [];
   const usages = useMemo(() => aircraftUsage(all), [all]);
   const usage = usages.find((u) => u.type === code);
   const family = aircraftFamily(code);
+  // 认识的系列都有 3D 模型（见 aircraft3d/families.ts 和它的测试）
+  const show3D = !no3D && !!family;
   const siblings = useMemo(() => {
     if (!family) return [];
     const flown = new Map(usages.map((u) => [u.type, u.flights.length]));
@@ -39,7 +53,9 @@ export function AircraftPage() {
   if (!ref.data || flights.isPending) return <Loading />;
 
   const name = aircraftName(code, ref.data);
-  const airline = pick ?? usage?.airlines[0]?.code ?? null;
+  // 换到别的机型时，没坐过的航司涂装不沿用
+  const picked = usage?.airlines.find((a) => a.code === pick)?.code;
+  const airline = picked ?? usage?.airlines[0]?.code ?? null;
   const dist = usage ? distanceParts(usage.km, unit) : null;
 
   return (
@@ -48,7 +64,7 @@ export function AircraftPage() {
         <ArrowLeft size={16} /> 统计
       </Link>
 
-      <section className="aircraft-hero">
+      <section className={`aircraft-hero${show3D ? " with-3d" : ""}`}>
         <div className="aircraft-hero-text">
           <span className="aircraft-maker">
             {family ? `${family.maker} · ${family.name}` : "机型"} · {code}
@@ -61,7 +77,16 @@ export function AircraftPage() {
             </p>
           )}
         </div>
-        <AircraftProfile type={code} airline={airline} refData={ref.data} className="aircraft-hero-art" dimensions />
+        {show3D ? (
+          // 加载时先用侧视图占位
+          <Suspense
+            fallback={<AircraftProfile type={code} airline={airline} refData={ref.data} className="aircraft-hero-art" dimensions />}
+          >
+            <Aircraft3D type={code} airline={airline} refData={ref.data} label={name} onFail={() => setNo3D(true)} />
+          </Suspense>
+        ) : (
+          <AircraftProfile type={code} airline={airline} refData={ref.data} className="aircraft-hero-art" dimensions />
+        )}
         {usage && usage.airlines.length > 1 && (
           <div className="livery-picker" role="group" aria-label="涂装">
             {usage.airlines.map((a) => (
