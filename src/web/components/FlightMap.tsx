@@ -625,7 +625,13 @@ export const FlightMap = forwardRef<FlightMapHandle, Props>(function FlightMap(
           pulse.className = "home-pulse";
           el.appendChild(pulse);
         }
-        const marker: Marker = new maplibregl.Marker({ element: el, anchor: "bottom", opacityWhenCovered: "0" })
+        const marker: Marker = new maplibregl.Marker({
+          element: el,
+          anchor: "bottom",
+          opacityWhenCovered: "0",
+          // 默认停下时取整，所有标签会一起跳一下；普通屏还是取整，保证字清晰
+          subpixelPositioning: window.devicePixelRatio >= 2,
+        })
           .setLngLat(f.geometry.coordinates as [number, number])
           .addTo(map);
         return { el: label, marker, count: p.count, lngLat: marker.getLngLat(), vec: toVec(f.geometry.coordinates) };

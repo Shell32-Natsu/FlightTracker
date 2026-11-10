@@ -43,6 +43,18 @@ export function sample(coords: Position[], s: number): [number, number] {
   return [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k];
 }
 
+/**
+ * 画到 progress（0–1）时折线各点的位置，最后一点正好落在 progress 上。
+ * 只取整段的话，入场减速到最后，线头会停半秒再跳一格。
+ */
+export function arcSteps(progress: number): number[] {
+  const p = Math.min(1, Math.max(0, progress));
+  const steps: number[] = [];
+  for (let i = 0; i < p * STEPS; i++) steps.push(i / STEPS);
+  steps.push(p);
+  return steps;
+}
+
 const lift = (peak: number, s: number) => peak * Math.sin(Math.PI * s);
 
 function makeArc(f: Feature<LineString>): Arc {
@@ -122,15 +134,17 @@ export function attachRouteArcs(map: MapLibreMap, opts: { comets: boolean }): Ro
     const cam = globeCamera(map);
     const proj = new GlobeProjector(cam);
     const flat = flatten(cam.R, cam.D);
-    const limit = progress * STEPS;
+    const steps = arcSteps(progress);
     ctx.lineCap = ctx.lineJoin = "round";
     // 航线特别多时省掉最宽的那层光
     const passes =
       style.glow <= 0 ? [] : arcs.length > 160 ? [[4, 0.16 * style.glow]] : [[9, 0.07 * style.glow], [4.5, 0.15 * style.glow]];
 
     const paint = (arc: Arc) => {
-      const pts: ScreenPoint[] = [];
-      for (let i = 0; i <= STEPS && i <= limit; i++) pts.push(proj.project(arc.vecs[i], lift(arc.peak * flat, i / STEPS)));
+      const pts = steps.map((s, i) => {
+        const tip = s < 1 && i === steps.length - 1;
+        return proj.project(tip ? toVec(sample(arc.coords, s)) : arc.vecs[i], lift(arc.peak * flat, s));
+      });
       drawn.push({ key: arc.key, pts });
       const path = new Path2D();
       let pen = false;
@@ -285,6 +299,8 @@ export function attachRouteArcs(map: MapLibreMap, opts: { comets: boolean }): Ro
     },
     setProgress(p) {
       progress = p;
+      // 光点等镜头也停稳了再出来（镜头比航线晚停 0.4 秒）：它每帧都要重画，会和最后一段运镜抢
+      if (p >= 1) nextAt = performance.now() + 700;
       // 跟着地图的下一帧一起画，不另画一遍
       map.triggerRepaint();
     },
