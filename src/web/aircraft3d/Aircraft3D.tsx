@@ -25,7 +25,7 @@ import { useAirlineLogo } from "../lib/logos";
 import { airlineAccent, liveryFor, type Livery } from "../aircraft/livery";
 import { buildAircraft, type AircraftModel } from "./model";
 import { spec3DFor } from "./families";
-import { stabSections, wingSections } from "./geometry";
+import { fitDistance, outerPoints } from "./framing";
 
 interface Props {
   type: string;
@@ -144,13 +144,6 @@ export default function Aircraft3D({ type, airline, refData, label, onFail }: Pr
     shadow.position.y = box.min.y - R * 0.16;
     scene.add(shadow);
 
-    const off = spec.length / 2;
-    const wingEnd = wingSections(spec).at(-1)!;
-    const wingtip = new Vector3(wingEnd.x - off, wingEnd.y, wingEnd.z);
-    const stabEnd = stabSections(spec.stab).at(-1)!;
-    const stabTip = new Vector3(stabEnd.x + stabEnd.chord - off, stabEnd.y, stabEnd.z);
-    const finTip = new Vector3(spec.fin.x + spec.fin.sections[0].chord - off, 0, 0);
-
     const camera = new PerspectiveCamera(24, 1, 1, R * 20);
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enablePan = false;
@@ -165,26 +158,19 @@ export default function Aircraft3D({ type, airline, refData, label, onFail }: Pr
     // 手机上竖着滑是滚页面，横着滑才是转飞机
     renderer.domElement.style.touchAction = "pan-y";
 
-    // 初始：机头朝左前方的四分之三视角。镜头距离按机头、机尾、翼尖、尾翼能不能放进画面算，
-    // 侧面、正面转过来时也要放得下
-    const dir = new Vector3(-0.6, 0.3, 0.8).normalize();
-    const right = new Vector3(0, 1, 0).cross(dir).normalize();
-    const upward = dir.clone().cross(right);
-    const tips = [1, -1].flatMap((z) => [
-      new Vector3(wingtip.x, wingtip.y, z * box.max.z),
-      new Vector3(stabTip.x, stabTip.y, z * stabTip.z),
-    ]);
-    const key = [new Vector3(box.min.x, 0, 0), new Vector3(box.max.x, 0, 0), new Vector3(finTip.x, box.max.y, 0), ...tips].map((v) =>
-      v.sub(controls.target),
-    );
-    const view = (aspect: number) => {
-      const half = Math.tan((camera.fov * Math.PI) / 360);
+    // 镜头距离随视角变：转到哪个角度都刚好放得下，不裁机头、翼尖
+    const outer = outerPoints(m.root);
+    const half = Math.tan((camera.fov * Math.PI) / 360);
+    const offset = new Vector3();
+    const place = () => {
       // 窄屏上给底部的涂装按钮多让一点
-      const [mx, my] = [half * aspect * (el.clientWidth < 760 ? 0.88 : 0.94), half * 0.8];
-      const fit = key.map((v) => v.dot(dir) + Math.max(Math.abs(v.dot(right)) / mx, Math.abs(v.dot(upward)) / my));
-      return Math.max(...fit, (Math.max(spec.length, box.max.z * 2) * 0.5) / mx, (R * 0.4) / half);
+      const mx = half * camera.aspect * (el.clientWidth < 760 ? 0.88 : 0.94);
+      offset.subVectors(camera.position, controls.target).normalize();
+      const d = fitDistance(outer, controls.target, offset, mx, half * 0.8);
+      camera.position.copy(controls.target).addScaledVector(offset, d);
     };
-    let placed = false;
+    // 初始：机头朝左前方的四分之三视角
+    camera.position.set(-0.6, 0.3, 0.8).add(controls.target);
     const resize = () => {
       const w = el.clientWidth;
       const h = el.clientHeight;
@@ -193,11 +179,7 @@ export default function Aircraft3D({ type, airline, refData, label, onFail }: Pr
       camera.aspect = w / h;
       // 标题在左上角，飞机往下放一点
       camera.setViewOffset(w, h, 0, -h * 0.045, w, h);
-      const d = view(camera.aspect);
-      if (!placed) {
-        camera.position.copy(dir).multiplyScalar(d).add(controls.target);
-        placed = true;
-      } else camera.position.sub(controls.target).setLength(d).add(controls.target);
+      place();
       camera.updateProjectionMatrix();
       wake.current();
     };
@@ -210,6 +192,7 @@ export default function Aircraft3D({ type, airline, refData, label, onFail }: Pr
       const dt = Math.min(0.1, (now - last) / 1000);
       last = now;
       controls.update(dt);
+      place();
       if (!still) for (const f of m.fans) f.rotation.x += dt * 5;
       renderer.render(scene, camera);
       idleFrames++;

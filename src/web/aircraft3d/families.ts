@@ -424,7 +424,8 @@ const FAMILY: Record<string, Family> = {
     const top: Profile = [...hump.top.filter(([x]) => x < 11), [11, 4.92], [end, 4.92], [end + 2.5, 4.72], [end + 5, 4.28], [end + 7.5, 3.74], [end + 10, 3.38], [end + 12, 3.28]];
     const s = stretchSpec(B748, L, {
       hump: { r: hump.r, top },
-      tip: classic ? none : blended(2.6),
+      // 日本国内型 747-400D 没有小翼
+      tip: classic || t === "B74D" ? none : blended(2.6),
       engines: [
         { mount: "wing", z: 11.9, length: 6.3, diameter: 2.85, drop: 2.2, ahead: 4.4 },
         { mount: "wing", z: 20.9, length: 6.3, diameter: 2.85, drop: 1.9, ahead: 4.4 },
