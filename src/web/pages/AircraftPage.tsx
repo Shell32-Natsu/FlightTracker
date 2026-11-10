@@ -7,6 +7,7 @@ import { useUnit } from "../lib/useUnit";
 import { aircraftName, airlineName, distanceParts, formatDate, formatHours } from "../lib/format";
 import { aircraftFamily, familyTypes } from "../../shared/aircraft";
 import { AircraftProfile } from "../aircraft/AircraftProfile";
+import { AircraftPicture } from "../aircraft3d/AircraftPicture";
 import { aircraftUsage } from "../aircraft/usage";
 import { FlightTicket, ticketFromFlight } from "../ticket/FlightTicket";
 import { AirlineLogo } from "../ui/AirlineBadge";
@@ -181,7 +182,7 @@ export function AircraftPage() {
                   {siblings.map((s) => (
                     <li key={s.type}>
                       <Link to={`/aircraft/${s.type}`} onClick={() => setPick(null)}>
-                        <AircraftProfile type={s.type} refData={ref.data} className="sibling-art" />
+                        <AircraftPicture type={s.type} refData={ref.data} className="sibling-art" size="thumb" />
                         <span>
                           <b>{aircraftName(s.type, ref.data).replace(/^(Boeing|Airbus) /, "")}</b>
                           <small>{s.count} 次</small>

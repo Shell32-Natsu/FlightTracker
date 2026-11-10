@@ -38,7 +38,7 @@ import { ColumnChart, type Column } from "../charts/ColumnChart";
 import { MonthHeatmap } from "../charts/MonthHeatmap";
 import { RouteBackdrop } from "../charts/RouteBackdrop";
 import { FlightTicket, ticketFromFlight } from "../ticket/FlightTicket";
-import { AircraftProfile } from "../aircraft/AircraftProfile";
+import { AircraftPicture } from "../aircraft3d/AircraftPicture";
 import { aircraftUsage } from "../aircraft/usage";
 import { YearFilter } from "../ui/YearFilter";
 import { CountUp } from "../ui/CountUp";
@@ -457,7 +457,7 @@ function Hangar({ flights, refData }: { flights: Flight[]; refData: RefData }) {
                   {u.flights.length} 次{u.minutes > 0 && ` · ${formatHours(u.minutes)}`}
                 </span>
               </span>
-              <AircraftProfile type={u.type} airline={u.airlines[0]?.code} refData={refData} className="hangar-art" />
+              <AircraftPicture type={u.type} airline={u.airlines[0]?.code} refData={refData} className="hangar-art" />
             </Link>
           </li>
         ))}

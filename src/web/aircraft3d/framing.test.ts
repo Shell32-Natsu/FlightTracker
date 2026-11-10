@@ -1,7 +1,7 @@
-import { InstancedMesh, Matrix4, Mesh, Object3D, PlaneGeometry, Vector3 } from "three";
+import { InstancedMesh, Matrix4, Mesh, Object3D, PerspectiveCamera, PlaneGeometry, Vector3 } from "three";
 import { describe, expect, it } from "vitest";
 import { spec3DFor } from "./families";
-import { fitDistance, outerPoints } from "./framing";
+import { cropWindow, fitDistance, outerPoints, viewBounds } from "./framing";
 import { finGeometry, fuselageGeometry, liftingGeometry, stabSections, tipBlades, wingSections } from "./geometry";
 
 /** 机身、机翼、尾翼（不含要画布的部分） */
@@ -60,4 +60,36 @@ it("实例化的网格（桨叶）每一片都算进去", () => {
   const ys = outerPoints(root).map((p) => p.y);
   expect(Math.max(...ys)).toBeCloseTo(2);
   expect(Math.min(...ys)).toBeCloseTo(-2);
+});
+
+it("静态图的裁切范围刚好包住所有点", () => {
+  const points = [new Vector3(-2, 0, 0), new Vector3(3, 0, 0), new Vector3(0, 1, 0), new Vector3(0, 0, 5)];
+  const b = viewBounds(points, new Vector3(), new Vector3(0, 0, 1), 10);
+  expect(b.x0).toBeCloseTo(-0.2);
+  expect(b.x1).toBeCloseTo(0.3);
+  expect(b.y0).toBeCloseTo(0);
+  expect(b.y1).toBeCloseTo(0.1);
+  // 离镜头近的点投影更靠外
+  expect(viewBounds([new Vector3(1, 0, 5)], new Vector3(), new Vector3(0, 0, 1), 10).x1).toBeCloseTo(0.2);
+});
+
+it.each(["A388", "AT76", "MD82"])("%s 的静态图：整架飞机在裁切窗口里，而且贴着边", (type) => {
+  const points = outerPoints(shell(type));
+  const target = new Vector3(0, 2, 0);
+  const dir = new Vector3(-0.5, 0.2, 0.84).normalize();
+  const distance = 200;
+  const c = cropWindow(viewBounds(points, target, dir, distance), 1000);
+  const camera = new PerspectiveCamera((Math.atan(c.half) * 360) / Math.PI, 1, 1, 600);
+  camera.position.copy(target).addScaledVector(dir, distance);
+  camera.lookAt(target);
+  camera.setViewOffset(c.full, c.full, c.x, c.y, 1000, c.height);
+  camera.updateMatrixWorld(true);
+  const q = points.map((p) => p.clone().project(camera));
+  for (const axis of ["x", "y"] as const) {
+    const v = q.map((p) => p[axis]);
+    expect(Math.max(...v)).toBeLessThan(1);
+    expect(Math.min(...v)).toBeGreaterThan(-1);
+    expect(Math.max(...v)).toBeGreaterThan(0.85);
+    expect(Math.min(...v)).toBeLessThan(-0.85);
+  }
 });

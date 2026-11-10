@@ -153,7 +153,7 @@ git checkout wrangler.jsonc   # 脚本改动只用于这次部署，不要提交
 
 ## 航司徽标与机型
 
-- **3D 模型**：`src/web/aircraft3d/` 用 three.js 参数化生成（机身放样、翼型曲面、带风扇的短舱），涂装画成贴图，机型页按需加载。`shared/aircraft.ts` 里的机型都有：A320neo、777-300ER、747-8 逐项手调（`specs.ts`），其余按系列的翼展、弦长、机身等数据生成（`families.ts`）。外形是近似值，不是照图纸建模。不认识的机型和没有 WebGL 的浏览器显示侧视图。
+- **3D 模型**：`src/web/aircraft3d/` 用 three.js 参数化生成（机身放样、翼型曲面、带风扇的短舱），涂装画成贴图，机型页按需加载；统计页“机库”和机型页“同系列”用同一套模型渲染的静态图（`AircraftPicture`）。`shared/aircraft.ts` 里的机型都有：A320neo、777-300ER、747-8 逐项手调（`specs.ts`），其余按系列的翼展、弦长、机身等数据生成（`families.ts`）。外形是近似值，不是照图纸建模。不认识的机型和没有 WebGL 的浏览器显示侧视图。
 - **徽标**：`/api/logos/:code` 由 Worker 取图并做边缘缓存，先用 Duffel 的矢量徽标，没有再用 Aviasales 的位图，都没有时前端显示航司代码方块。徽标是各航司的商标，只在运行时取用，不放进仓库。
 - **机型侧视图**：`src/web/aircraft/` 按真实尺寸参数化绘制（机身长短粗细、发动机位置、T 尾、驼峰等），涂装是简化的：垂尾主色 + 尾翼徽标 + 机身标题，常见航司的颜色在 `livery.ts` 里，其余从徽标取色。机型参数和系列在 `src/shared/aircraft.ts`。
 - **机型介绍**：`/api/aircraft-info/:type` 代理维基百科摘要（先中文再英文），缓存 7 天；页面上注明来源和 CC BY-SA 许可。

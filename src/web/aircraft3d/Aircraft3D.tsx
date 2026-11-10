@@ -1,31 +1,22 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { Rotate3d } from "lucide-react";
 import {
-  Box3,
   CanvasTexture,
   Color,
-  DirectionalLight,
-  HemisphereLight,
   Mesh,
   MeshBasicMaterial,
-  NeutralToneMapping,
-  PCFSoftShadowMap,
   PerspectiveCamera,
   PlaneGeometry,
-  PMREMGenerator,
-  Scene,
-  Sphere,
   Vector3,
-  WebGLRenderer,
+  type WebGLRenderer,
 } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import type { RefData } from "../lib/refdata";
-import { useAirlineLogo } from "../lib/logos";
-import { airlineAccent, liveryFor, type Livery } from "../aircraft/livery";
 import { buildAircraft, type AircraftModel } from "./model";
 import { spec3DFor } from "./families";
 import { fitDistance, outerPoints } from "./framing";
+import { createRenderer, createStage, releaseRenderer, type Stage } from "./stage";
+import { usePaint } from "./usePaint";
 
 interface Props {
   type: string;
@@ -36,35 +27,13 @@ interface Props {
   onFail: () => void;
 }
 
-const PLAIN: Livery = { tail: "#e8ecf2", logo: "color", titles: "", titleColor: "#000" };
-
 /** 可以拖着转的 3D 飞机。只在看得见的时候渲染；静止不动时停帧。 */
 export default function Aircraft3D({ type, airline, refData, label, onFail }: Props) {
   const host = useRef<HTMLDivElement>(null);
-  const logo = useAirlineLogo(airline);
-  const [decoded, setDecoded] = useState<HTMLImageElement | null>(null);
   const model = useRef<AircraftModel | null>(null);
   const wake = useRef<() => void>(() => {});
 
-  // 徽标是 data URL，解码成图片才能画进贴图
-  useEffect(() => {
-    if (!logo.data) return;
-    let live = true;
-    const img = new Image();
-    img.src = logo.data.src;
-    img.decode().then(
-      () => live && setDecoded(img),
-      () => {},
-    );
-    return () => {
-      live = false;
-    };
-  }, [logo.data]);
-
-  // 换航司的那一刻，解码好的还是上一家的徽标，不能画上去
-  const image = decoded && decoded.src === logo.data?.src ? decoded : null;
-  const livery = airline ? liveryFor(airline, logo.data?.color, refData) : PLAIN;
-  const paint = { livery, accent: airline ? airlineAccent(airline) : null, logo: image };
+  const { paint } = usePaint(airline, refData);
   const latest = useRef(paint);
   latest.current = paint;
   const painted = useRef<typeof paint | null>(null);
@@ -76,7 +45,7 @@ export default function Aircraft3D({ type, airline, refData, label, onFail }: Pr
     if (!spec) return onFail();
     let renderer: WebGLRenderer;
     try {
-      renderer = new WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
+      renderer = createRenderer();
     } catch {
       onFail();
       return;
@@ -84,56 +53,23 @@ export default function Aircraft3D({ type, airline, refData, label, onFail }: Pr
     const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
     const coarse = window.matchMedia?.("(pointer: coarse)").matches ?? false;
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.toneMapping = NeutralToneMapping;
-    renderer.toneMappingExposure = 0.9;
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = PCFSoftShadowMap;
     el.append(renderer.domElement);
 
-    const scene = new Scene();
-    const pmrem = new PMREMGenerator(renderer);
-    const env = pmrem.fromScene(new RoomEnvironment(), 0.03);
-    scene.environment = env.texture;
-    scene.environmentIntensity = 0.42;
-    scene.add(new HemisphereLight("#dce8ff", "#48546e", 0.32));
-    const sun = new DirectionalLight("#fff1dc", 1.9);
-    sun.castShadow = true;
-    sun.shadow.mapSize.set(coarse ? 1024 : 2048, coarse ? 1024 : 2048);
-    sun.shadow.normalBias = 0.06;
-    scene.add(sun, sun.target);
-    const rim = new DirectionalLight("#a9c8ff", 0.9);
-    scene.add(rim);
-
     let m: AircraftModel;
+    let stage: Stage;
     try {
       m = buildAircraft(spec, latest.current, coarse ? 2048 : 4096);
+      stage = createStage(renderer, m, coarse ? 1024 : 2048);
     } catch (err) {
       console.error(err);
-      env.dispose();
-      pmrem.dispose();
-      renderer.dispose();
+      releaseRenderer(renderer);
       renderer.domElement.remove();
       onFail();
       return;
     }
     model.current = m;
     painted.current = latest.current;
-    scene.add(m.root);
-
-    const box = new Box3().setFromObject(m.root);
-    const ball = box.getBoundingSphere(new Sphere());
-    const R = ball.radius;
-    sun.position.set(-R * 0.55, R * 1.5, R * 0.42);
-    const sc = sun.shadow.camera;
-    sc.left = sc.bottom = -R;
-    sc.right = sc.top = R;
-    sc.near = 1;
-    sc.far = R * 4;
-    rim.position.set(R, R * 0.4, -R);
-
-    // 光和飞机都不动（转的是镜头），阴影只算一次
-    sun.shadow.autoUpdate = false;
-    sun.shadow.needsUpdate = true;
+    const { scene, box, R } = stage;
 
     // 脚下垫一团柔和的影子
     const shadow = new Mesh(
@@ -220,8 +156,9 @@ export default function Aircraft3D({ type, airline, refData, label, onFail }: Pr
     controls.addEventListener("start", onStart);
     controls.addEventListener("end", onEnd);
     controls.addEventListener("change", () => wake.current());
-    const io = new IntersectionObserver(([e]) => {
-      visible = e.isIntersecting;
+    const io = new IntersectionObserver((entries) => {
+      // 一次可能来好几条，最后一条才是现在的状态
+      visible = entries[entries.length - 1].isIntersecting;
       if (visible) wake.current();
     });
     io.observe(el);
@@ -245,11 +182,8 @@ export default function Aircraft3D({ type, airline, refData, label, onFail }: Pr
       shadow.geometry.dispose();
       shadow.material.map?.dispose();
       shadow.material.dispose();
-      env.dispose();
-      pmrem.dispose();
-      renderer.dispose();
-      // 浏览器限制同时存在的 WebGL 上下文数，离开时立即还回去
-      renderer.forceContextLoss();
+      stage.dispose();
+      releaseRenderer(renderer);
       renderer.domElement.remove();
       model.current = null;
       wake.current = () => {};
@@ -272,7 +206,7 @@ export default function Aircraft3D({ type, airline, refData, label, onFail }: Pr
     wake.current();
     // onFail 只在出错时调用
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [airline, image, logo.data?.color]);
+  }, [paint]);
 
   return (
     <>

@@ -4724,9 +4724,35 @@ a.record-card:hover,
   color: rgba(255, 255, 255, 0.78);
 }
 
+.aircraft-picture {
+  display: grid;
+  place-items: center;
+}
+
+.aircraft-picture img {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  object-fit: contain;
+  animation: picture-in 0.45s var(--ease);
+}
+
+@keyframes picture-in {
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aircraft-picture img {
+    animation: none;
+  }
+}
+
 .hangar-art {
   width: 100%;
-  height: 64px;
+  height: 116px;
   filter: drop-shadow(0 6px 8px rgba(8, 24, 60, 0.35));
 }
 
@@ -4740,7 +4766,7 @@ a.record-card:hover,
 }
 
 .hangar-list .lead .hangar-art {
-  height: 132px;
+  height: 220px;
 }
 
 @media (max-width: 640px) {
@@ -4748,8 +4774,9 @@ a.record-card:hover,
   .hangar-list .lead a {
     grid-template-columns: 1fr;
   }
+  .hangar-list .hangar-art,
   .hangar-list .lead .hangar-art {
-    height: 96px;
+    height: 108px;
   }
 }
 
@@ -4946,7 +4973,7 @@ a.record-card:hover,
 
 .sibling-art {
   width: 120px;
-  height: 36px;
+  height: 48px;
 }
 
 .sibling-list span {
