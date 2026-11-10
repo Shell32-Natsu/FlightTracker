@@ -1,43 +1,7 @@
 import type { Map as MapLibreMap } from "maplibre-gl";
-
-export interface GlobeView {
-  /** 地球轮廓在屏幕上的圆 */
-  x: number;
-  y: number;
-  r: number;
-  /** 视野中心的经纬度，和“刚好看得见”的角距离余弦 */
-  lng: number;
-  lat: number;
-  horizonCos: number;
-}
+import { discRadius, globeCamera } from "./globeProjector";
 
 const RAD = Math.PI / 180;
-
-/**
- * 地球投影下的视野几何，只用 MapLibre 的公开接口（俯仰角恒为 0，圆心就是视野中心）。
- * 球半径 R（像素）：缩放级别 z 时赤道周长 512·2^z，中心纬度越高放得越大；
- * 相机离球面 D：由视口高度和视场角决定。轮廓是过相机的切锥，
- * 屏幕半径 = D·R / √((D+R)² − R²)，地平线处的角距离余弦 = R / (R+D)。
- */
-export function globeView(map: MapLibreMap): GlobeView {
-  const { lng, lat } = map.getCenter();
-  const { x, y } = map.project([lng, lat]);
-  const R = (512 * 2 ** map.getZoom()) / (2 * Math.PI) / Math.cos(lat * RAD);
-  const D = (0.5 * map.getContainer().clientHeight) / Math.tan((map.getVerticalFieldOfView() * RAD) / 2);
-  return { x, y, r: discRadius(D, R), lng, lat, horizonCos: R / (R + D) };
-}
-
-export function discRadius(D: number, R: number): number {
-  return (D * R) / Math.sqrt((D + R) ** 2 - R ** 2);
-}
-
-/** 这个点是不是转到地球背面去了 */
-export function isBehind(v: GlobeView, lng: number, lat: number): boolean {
-  const cos =
-    Math.sin(v.lat * RAD) * Math.sin(lat * RAD) +
-    Math.cos(v.lat * RAD) * Math.cos(lat * RAD) * Math.cos((lng - v.lng) * RAD);
-  return cos < v.horizonCos;
-}
 
 /** 以 center 为视野中心时，让这些点放进 width × height 的缩放级别（按正射投影近似，留一点余量）。 */
 export function zoomToFit(points: [number, number][], center: [number, number], width: number, height: number): number {
@@ -88,15 +52,16 @@ export function attachGlobeLight(map: MapLibreMap): { setVisible: (v: boolean) =
   };
   const update = () => {
     if (!visible) return show(0);
-    const d = globeView(map);
+    const c = globeCamera(map);
+    const r = discRadius(c.D, c.R);
     const half = Math.hypot(canvas.clientWidth, canvas.clientHeight) / 2;
     // 球的边缘快出画面时开始淡出
-    const fade = Math.min(1, Math.max(0, (half * 1.7 - d.r) / (half * 0.9)));
+    const fade = Math.min(1, Math.max(0, (half * 1.7 - r) / (half * 0.9)));
     show(fade);
     if (fade === 0) return;
-    const at = `translate(${d.x - BASE / 2}px, ${d.y - BASE / 2}px)`;
-    halo.style.transform = `${at} scale(${(d.r * 2 * HALO) / BASE})`;
-    shade.style.transform = `${at} scale(${(d.r * 2) / BASE})`;
+    const at = `translate(${c.x - BASE / 2}px, ${c.y - BASE / 2}px)`;
+    halo.style.transform = `${at} scale(${(r * 2 * HALO) / BASE})`;
+    shade.style.transform = `${at} scale(${(r * 2) / BASE})`;
   };
   update();
   map.on("move", update);

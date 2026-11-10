@@ -61,7 +61,7 @@ export function AircraftPage() {
             </p>
           )}
         </div>
-        <AircraftProfile type={code} airline={airline} refData={ref.data} className="aircraft-hero-art" />
+        <AircraftProfile type={code} airline={airline} refData={ref.data} className="aircraft-hero-art" dimensions />
         {usage && usage.airlines.length > 1 && (
           <div className="livery-picker" role="group" aria-label="涂装">
             {usage.airlines.map((a) => (

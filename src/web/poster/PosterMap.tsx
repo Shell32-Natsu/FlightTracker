@@ -13,7 +13,8 @@ import type { GeometryCollection, Topology } from "topojson-specification";
 import type { FeatureCollection, MultiLineString } from "geojson";
 import type { PosterPalette } from "./palettes";
 import type { PosterAirport, PosterRoute } from "./data";
-import { FONT } from "./text";
+import { arcPeak } from "../components/routeArcs";
+import { display } from "./text";
 
 export interface MapBox {
   x: number;
@@ -44,6 +45,10 @@ interface Props {
   /** 线宽、点大小的整体缩放 */
   k?: number;
   labels?: number;
+  /** 陆地画成点阵（不画海洋、国界、经纬网） */
+  dots?: boolean;
+  /** 航线画成拱起的弧：地球上离地拱起；单条航线的卡片上在屏幕里向上弯 */
+  lifted?: "globe" | "screen";
 }
 
 const countriesCache = new WeakMap<Topology, FeatureCollection>();
@@ -73,6 +78,8 @@ export function PosterMap({
   fitPadding = { top: 60, right: 60, bottom: 60, left: 60 },
   k = 1,
   labels = 0,
+  dots: dotted = false,
+  lifted,
 }: Props) {
   const id = useId().replace(/:/g, "");
   const fc = countries(world);
@@ -140,7 +147,13 @@ export function PosterMap({
 
   // 航线：单色模式用沿航线方向的渐变（起点 → 终点）
   const routeEls = routes.map((r, i) => {
-    const d = path({ type: "LineString", coordinates: [r.a, r.b] });
+    const ground = path({ type: "LineString", coordinates: [r.a, r.b] });
+    const d =
+      lifted === "globe"
+        ? liftedGlobePath(r.a, r.b, center, projection.scale(), cx, cy)
+        : lifted === "screen"
+          ? liftedScreenPath(projection(r.a), projection(r.b))
+          : ground;
     if (!d) return null;
     const w = (1.1 + Math.log2(r.count) * 0.9) * k;
     let stroke = r.color ?? p.routeFrom;
@@ -159,7 +172,7 @@ export function PosterMap({
         stroke = `url(#${gid})`;
       }
     }
-    return { d, w, stroke, gradient, key: r.key };
+    return { d, ground, w, stroke, gradient, key: r.key };
   });
 
   const maxCount = Math.max(1, ...airports.map((a) => a.count));
@@ -201,27 +214,74 @@ export function PosterMap({
         </filter>
         {kind === "orthographic" && (
           <radialGradient id={`${id}-shade`} cx="35%" cy="30%" r="80%">
-            <stop offset="0" stopColor="#ffffff" stopOpacity={p.id === "night" ? 0.06 : 0.25} />
-            <stop offset="1" stopColor="#000000" stopOpacity={p.id === "night" ? 0.35 : 0.08} />
+            <stop offset="0" stopColor="#ffffff" stopOpacity={p.id === "night" ? 0.14 : 0.34} />
+            <stop offset="0.45" stopColor={p.id === "paper" ? "#5c3e1c" : "#0a1c44"} stopOpacity={0} />
+            <stop offset="1" stopColor={p.id === "paper" ? "#4e3214" : p.id === "light" ? "#20468c" : "#01030a"} stopOpacity={p.id === "night" ? 0.7 : 0.36} />
           </radialGradient>
         )}
         {routeEls.map((r) => r && <Fragment key={r.key}>{r.gradient}</Fragment>)}
       </defs>
 
+      {dotted && (
+        <defs>
+          {(["dot", "dotVisited"] as const).map((c) => (
+            <pattern key={c} id={`${id}-${c}`} width={7.2 * k} height={7.2 * k} patternUnits="userSpaceOnUse">
+              <circle cx={3.6 * k} cy={3.6 * k} r={(c === "dot" ? 1.6 : 1.95) * k} fill={p[c]} />
+            </pattern>
+          ))}
+        </defs>
+      )}
       <g clipPath={`url(#${id}-clip)`}>
-        <path d={path({ type: "Sphere" }) ?? ""} fill={p.ocean} />
-        <path d={path(geoGraticule10()) ?? ""} fill="none" stroke={p.graticule} strokeWidth={0.8 * k} />
-        {fc.features.map((f, i) => (
-          <path
-            key={i}
-            d={path(f) ?? ""}
-            fill={visited.has(String(f.id)) ? p.visited : p.land}
-            stroke={p.border}
-            strokeWidth={0.6 * k}
-            strokeLinejoin="round"
-          />
-        ))}
+        {dotted ? (
+          fc.features
+            .filter((f) => String(f.id) !== "010")
+            .map((f, i) => (
+              <path
+                key={i}
+                d={path(f) ?? ""}
+                fill={`url(#${id}-${visited.has(String(f.id)) ? "dotVisited" : "dot"})`}
+              />
+            ))
+        ) : (
+          <>
+            <path d={path({ type: "Sphere" }) ?? ""} fill={p.ocean} />
+            <path d={path(geoGraticule10()) ?? ""} fill="none" stroke={p.graticule} strokeWidth={0.8 * k} />
+            {fc.features.map((f, i) => (
+              <path
+                key={i}
+                d={path(f) ?? ""}
+                fill={visited.has(String(f.id)) ? p.visited : p.land}
+                stroke={p.border}
+                strokeWidth={0.6 * k}
+                strokeLinejoin="round"
+              />
+            ))}
+          </>
+        )}
         {kind === "orthographic" && <circle cx={cx} cy={cy} r={projection.scale()} fill={`url(#${id}-shade)`} />}
+        {/* 拱起的航线在地面的投影 */}
+        {lifted &&
+          routeEls.map(
+            (r) =>
+              r?.ground && (
+                <path
+                  key={`shadow-${r.key}`}
+                  d={r.ground}
+                  fill="none"
+                  stroke={p.id === "night" ? "#02060f" : p.text}
+                  strokeOpacity={p.id === "night" ? 0.55 : 0.2}
+                  strokeWidth={lifted === "screen" ? 1.6 * k : r.w}
+                  strokeDasharray={lifted === "screen" ? `${2 * k} ${5 * k}` : undefined}
+                  strokeLinecap="round"
+                />
+              ),
+          )}
+      </g>
+      {kind === "orthographic" && (
+        <circle cx={cx} cy={cy} r={projection.scale()} fill="none" stroke={p.id === "night" ? "rgba(140,180,255,0.45)" : p.id === "paper" ? "rgba(96,64,30,0.55)" : "rgba(255,255,255,0.9)"} strokeWidth={1.4 * k} />
+      )}
+      {/* 拱起的弧会伸到地球轮廓外面，不能用地球的裁剪 */}
+      <g clipPath={lifted ? undefined : `url(#${id}-clip)`}>
         {p.routeGlow &&
           routeEls.map(
             (r) =>
@@ -253,12 +313,11 @@ export function PosterMap({
             x={a.x}
             y={a.y - a.r - 5 * k}
             textAnchor="middle"
-            fontFamily={FONT}
-            fontSize={11 * k}
-            fontWeight={700}
-            letterSpacing={0.5 * k}
+            {...display(p.id, 700)}
+            fontSize={12.5 * k}
+            letterSpacing={0.6 * k}
             fill={p.text}
-            stroke={p.id === "night" ? "rgba(5,8,15,0.8)" : p.bg}
+            stroke={p.id === "night" ? "rgba(5,8,15,0.8)" : dotted ? p.bg : p.land}
             strokeWidth={3 * k}
             paintOrder="stroke"
           >
@@ -266,11 +325,9 @@ export function PosterMap({
           </text>
         ))}
       </g>
-      {kind === "orthographic" ? (
-        <circle cx={cx} cy={cy} r={projection.scale()} fill="none" stroke={p.id === "night" ? "rgba(140,180,255,0.35)" : p.faint} strokeWidth={1.2 * k} />
-      ) : !zoomed ? (
+      {kind === "equalEarth" && !zoomed && !dotted && (
         <path d={path({ type: "Sphere" }) ?? ""} fill="none" stroke={p.id === "paper" ? p.faint : "none"} strokeWidth={k} />
-      ) : null}
+      )}
     </g>
   );
 }
@@ -278,4 +335,49 @@ export function PosterMap({
 /** 两点大圆的中点，给单次航班卡片定中心用。 */
 export function routeCenter(a: [number, number], b: [number, number]): [number, number] {
   return geoInterpolate(a, b)(0.5) as [number, number];
+}
+
+/** 正射投影地球上离地拱起的航线；被地球挡住的部分断开。 */
+function liftedGlobePath(
+  a: [number, number],
+  b: [number, number],
+  center: [number, number],
+  R: number,
+  cx: number,
+  cy: number,
+): string {
+  const RAD = Math.PI / 180;
+  const peak = arcPeak(geoDistance(a, b));
+  const at = geoInterpolate(a, b);
+  const [s0, c0] = [Math.sin(center[1] * RAD), Math.cos(center[1] * RAD)];
+  let d = "";
+  let pen = false;
+  for (let i = 0; i <= 64; i++) {
+    const t = i / 64;
+    const [lon, lat] = at(t);
+    const [s, c] = [Math.sin(lat * RAD), Math.cos(lat * RAD)];
+    const dl = (lon - center[0]) * RAD;
+    const k = 1 + peak * Math.sin(Math.PI * t);
+    const x = k * c * Math.sin(dl);
+    const y = k * (c0 * s - s0 * c * Math.cos(dl));
+    const z = s0 * s + c0 * c * Math.cos(dl);
+    const visible = z >= 0 || x * x + y * y > 1;
+    if (visible) d += `${pen ? "L" : "M"}${(cx + R * x).toFixed(1)} ${(cy - R * y).toFixed(1)}`;
+    pen = visible;
+  }
+  return d;
+}
+
+/** 卡片上的单条航线：两点之间向上弯的弧。 */
+function liftedScreenPath(a: [number, number] | null, b: [number, number] | null): string {
+  if (!a || !b) return "";
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const len = Math.hypot(dx, dy);
+  // 法线取朝上的那一侧；竖直的航线往右弯
+  const sign = dx > 0 || (dx === 0 && dy < 0) ? -1 : 1;
+  const nx = (sign * -dy) / (len || 1);
+  const ny = (sign * dx) / (len || 1);
+  const bend = len * 0.34;
+  return `M${a[0]} ${a[1]}Q${(a[0] + b[0]) / 2 + nx * bend} ${(a[1] + b[1]) / 2 + ny * bend} ${b[0]} ${b[1]}`;
 }

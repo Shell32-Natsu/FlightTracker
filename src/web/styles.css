@@ -107,8 +107,11 @@
   --bp-ink: #17316a;
   /* 点阵地图 */
   --dot-land: rgb(150 180 235 / 0.26);
-  /* 标题用的字体（复古主题换成衬线） */
-  --font-display: var(--font);
+  /* 数字、三字码、机型这些“航站标识”用的字体：窄体的 Instrument Sans；复古主题换成衬线的 Fraunces */
+  --font-display: "Instrument Sans Variable", var(--font);
+  --display-stretch: 84%;
+  --display-weight: 650;
+  --display-tracking: -0.01em;
 
   /* 图表 */
   --grid: rgb(var(--fg-rgb) / 0.06);
@@ -313,11 +316,14 @@
   --bp-to: #2f4a5c;
   --bp-ink: #2f4a5c;
   --dot-land: rgb(120 84 40 / 0.3);
-  --font-display: "Songti SC", "STSong", "Noto Serif SC", "Source Han Serif SC", "Noto Serif CJK SC", Georgia, serif;
+  --font-display: "Fraunces Variable", "Songti SC", "STSong", "Noto Serif SC", "Source Han Serif SC", "Noto Serif CJK SC", Georgia, serif;
+  --display-stretch: 100%;
+  --display-weight: 520;
+  --display-tracking: -0.015em;
 }
 
-/* 复古：标题、机场代码、大数字用衬线字 */
-:root[data-theme="retro"] :is(h1, h2, .page-title, .section-title, .iata, .hud-hero .value, .hero-figure .value, .tile-value, .record-card b) {
+/* 复古：中文标题也用衬线 */
+:root[data-theme="retro"] :is(h1, h2, .page-title, .section-title) {
   font-family: var(--font-display);
   letter-spacing: 0;
 }
@@ -1326,7 +1332,7 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 
 .ticket-route {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: minmax(0, auto) minmax(76px, 1fr) minmax(0, auto);
   align-items: start;
   gap: 12px;
   padding: 14px 18px 18px;
@@ -1773,19 +1779,28 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   outline: none;
 }
 
+.map-scrim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(560px 360px at 0% 0%, rgb(var(--bg-rgb) / 0.82), rgb(var(--bg-rgb) / 0.4) 50%, transparent 100%),
+    linear-gradient(0deg, rgb(var(--bg-rgb) / 0.55), transparent 150px);
+}
+
 .hud {
   position: absolute;
   z-index: 5;
-  top: calc(14px + env(safe-area-inset-top));
-  left: 14px;
-  right: 14px;
+  top: calc(20px + env(safe-area-inset-top));
+  left: 20px;
+  right: 20px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 18px;
   pointer-events: none;
 }
 
-.hud > * {
+.hud-latest {
   pointer-events: auto;
 }
 
@@ -1794,14 +1809,6 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   border: 1px solid var(--line-2);
   backdrop-filter: var(--glass-blur);
   box-shadow: var(--glass-edge), var(--shadow);
-}
-
-.hud-card {
-  align-self: flex-start;
-  border-radius: var(--radius-l);
-  padding: 16px 18px;
-  min-width: 0;
-  max-width: 100%;
 }
 
 .demo-pill {
@@ -1837,7 +1844,6 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 
 .hud-hero {
   display: flex;
-  font-feature-settings: "tnum";
   align-items: baseline;
   gap: 6px;
   margin-top: 2px;
@@ -1875,48 +1881,11 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   color: var(--text-3);
 }
 
-.hud-filters {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  max-width: 100%;
-}
-
-.hud-filters .chips {
-  min-width: 0;
-}
-
-/* 地图上的筛选按钮较多，每个都模糊会在地图每帧重绘时拖慢速度：用更实的底色代替 */
-.hud-filters .chip,
-.hud-filters .select {
-  background-color: var(--hud-solid);
-  box-shadow: var(--glass-edge);
-}
-
-.hud-filters .chip.on {
-  background: var(--gold);
-}
-
-.hud-filters .select {
-  width: auto;
-  height: 34px;
-  border-radius: 17px;
-  font-size: 0.85rem;
-  max-width: 124px;
-  flex-shrink: 0;
-}
-
-@media (min-width: 900px) {
-  .hud-filters .select {
-    max-width: 180px;
-  }
-}
-
 .map-controls {
   position: absolute;
   z-index: 5;
   right: 14px;
-  bottom: calc(var(--dock-h) + var(--dock-gap) * 2 + 8px + env(safe-area-inset-bottom));
+  bottom: calc(var(--dock-h) + var(--dock-gap) * 3 + 76px + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
   border-radius: 14px;
@@ -1959,76 +1928,27 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 
 @media (min-width: 900px) {
   .hud {
-    top: 24px;
-    left: 24px;
+    top: 30px;
+    left: 34px;
     right: auto;
-    width: 312px;
-    max-height: calc(100% - 48px);
-  }
-
-  .hud-card {
-    align-self: stretch;
-    padding: 20px 22px;
+    width: 320px;
   }
 
   .hud-hero .value {
-    font-size: 3rem;
+    font-size: 4.4rem;
+  }
+
+  .hud-hero .unit {
+    font-size: 1.15rem;
   }
 
   .hud-stats {
-    justify-content: space-between;
-    gap: 10px;
-    margin-top: 16px;
-    padding-top: 14px;
-    border-top: 1px solid var(--line);
+    gap: 26px;
+    margin-top: 14px;
   }
 
-  /* 筛选收进一张和统计同宽的卡片，年份多了自动换行，不再压到地球上 */
-  .hud-filters {
-    flex-direction: column;
-    align-items: stretch;
-    padding: 12px;
-    border-radius: var(--radius-l);
-    background: var(--glass);
-    border: 1px solid var(--line-2);
-    backdrop-filter: var(--glass-blur);
-    box-shadow: var(--glass-edge), var(--shadow);
-  }
-
-  .hud-filters .chips {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    max-height: 156px;
-    overflow: hidden auto;
-    padding: 0;
-    -webkit-mask-image: none;
-    mask-image: none;
-  }
-
-  .hud-filters .chip {
-    padding: 0;
-    border-radius: 10px;
-    background-color: rgb(var(--fg-rgb) / 0.03);
-    border-color: transparent;
-    box-shadow: none;
-  }
-
-  .hud-filters .chip:hover {
-    background-color: rgb(var(--fg-rgb) / 0.07);
-  }
-
-  .hud-filters .chip.on {
-    background: var(--primary-bg);
-    box-shadow: var(--primary-edge);
-  }
-
-  .hud-filters .select {
-    width: 100%;
-    max-width: none;
-    border-radius: 10px;
-    background-color: rgb(var(--fg-rgb) / 0.03);
-    border-color: transparent;
-    box-shadow: none;
+  .hud-stat .v {
+    font-size: 1.5rem;
   }
 
   .map-controls {
@@ -2038,7 +1958,7 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 }
 
 /* 最近 / 下一段航班：屏幕够高才放 */
-@media (min-width: 900px) and (min-height: 660px) {
+@media (min-width: 900px) and (min-height: 560px) {
   .hud-latest {
     display: block;
     border-radius: var(--radius-l);
@@ -2066,6 +1986,193 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   }
 }
 
+/* 年份时间轴 */
+.timeline {
+  position: absolute;
+  z-index: 5;
+  left: var(--dock-gap);
+  right: var(--dock-gap);
+  bottom: calc(var(--dock-h) + var(--dock-gap) * 2 + env(safe-area-inset-bottom));
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 70px;
+  padding: 0 10px;
+  border-radius: 22px;
+}
+
+.tl-play {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: var(--gold-ink);
+  background: var(--primary-bg);
+  box-shadow:
+    var(--primary-edge),
+    0 6px 18px rgb(var(--accent-rgb) / 0.3);
+  cursor: pointer;
+  transition: transform 0.2s var(--ease);
+}
+
+.tl-play svg {
+  fill: currentColor;
+  stroke-width: 1.5;
+}
+
+.tl-play:hover {
+  transform: scale(1.06);
+}
+
+.tl-all {
+  flex: none;
+  height: 34px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tl-all:hover {
+  color: var(--text-1);
+}
+
+.tl-all.on {
+  color: var(--text-1);
+  background: rgb(var(--fg-rgb) / 0.09);
+}
+
+.tl-years {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  justify-content: safe center;
+  height: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+  position: relative;
+}
+
+.tl-years::-webkit-scrollbar {
+  display: none;
+}
+
+.tl-year {
+  flex: 1 0 46px;
+  max-width: 76px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  padding: 10px 0 9px;
+  border: 0;
+  background: none;
+  color: var(--text-3);
+  cursor: pointer;
+}
+
+.tl-bar {
+  width: 16px;
+  height: calc(var(--h) * 34px);
+  min-height: 2px;
+  border-radius: 5px 5px 2px 2px;
+  background: rgb(var(--fg-rgb) / 0.2);
+  transition:
+    background 0.25s,
+    height 0.45s var(--ease),
+    width 0.25s var(--ease);
+}
+
+.tl-label {
+  font-family: var(--font-display);
+  font-stretch: var(--display-stretch);
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1;
+  font-feature-settings: "tnum";
+  transition: color 0.2s;
+}
+
+/* 看全部时整条时间轴都亮着 */
+.timeline:has(.tl-all.on) .tl-bar {
+  background: linear-gradient(180deg, rgb(var(--accent-rgb) / 0.85), rgb(var(--accent-rgb) / 0.4));
+}
+
+.tl-year:hover:not(:disabled, .on) .tl-bar {
+  background: rgb(var(--fg-rgb) / 0.36);
+}
+
+.tl-year:hover:not(:disabled, .on) .tl-label {
+  color: var(--text-1);
+}
+
+.tl-year:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.tl-year.on .tl-bar {
+  width: 22px;
+  background: linear-gradient(180deg, var(--gold-2), var(--coral));
+  box-shadow: 0 0 18px rgb(var(--accent-rgb) / 0.45);
+}
+
+.tl-year.on .tl-label {
+  color: var(--gold);
+}
+
+.timeline .select {
+  flex: none;
+  width: 112px;
+  height: 38px;
+  border-radius: 12px;
+  border-color: transparent;
+  background-color: rgb(var(--fg-rgb) / 0.05);
+  font-size: 0.85rem;
+}
+
+/* 筛着某家航司（手机上只剩一个图标，也要看得出来） */
+.timeline .select.on {
+  border-color: rgb(var(--accent-rgb) / 0.55);
+  background-color: var(--gold-wash);
+}
+
+@media (max-width: 899px) {
+  .timeline .select {
+    width: 34px;
+    padding: 0;
+    color: transparent;
+    background-position: center;
+  }
+}
+
+@media (min-width: 900px) {
+  .timeline {
+    left: 34px;
+    right: 92px;
+    bottom: 24px;
+    max-width: 860px;
+    margin: 0 auto;
+    height: 76px;
+    padding: 0 14px;
+    gap: 10px;
+    border-radius: 24px;
+  }
+
+  .timeline .select {
+    width: 150px;
+  }
+}
+
 /* 地图里的标签用站点字体（MapLibre 自带样式会换成 Helvetica） */
 .flight-map.maplibregl-map {
   font: inherit;
@@ -2088,7 +2195,7 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   background: var(--globe-shade);
 }
 
-.route-comets {
+.map-overlay {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -2627,22 +2734,16 @@ input[type="time"]::-webkit-calendar-picker-indicator {
    ========================================================================== */
 
 .stats-hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   gap: 16px;
   margin-bottom: 16px;
-}
-
-@media (min-width: 900px) {
-  .stats-hero {
-    grid-template-columns: 1.3fr 1fr;
-  }
 }
 
 .hero-card {
   overflow: hidden;
   padding: 26px 26px 24px;
-  min-height: 400px;
+  min-height: 420px;
   display: flex;
   flex-direction: column;
   background:
@@ -2650,20 +2751,40 @@ input[type="time"]::-webkit-calendar-picker-indicator {
     radial-gradient(500px 240px at 0% 100%, rgba(88, 120, 255, 0.12), transparent 70%), var(--card-bg);
 }
 
-/* 让开上面的大数字和底部的小标签 */
+/* 手机上放在大数字和小标签之间；宽屏占右边三分之二 */
 .route-backdrop {
   position: absolute;
-  inset: 136px 10px 70px 10px;
+  inset: 130px 10px 110px;
   width: calc(100% - 20px);
-  height: calc(100% - 206px);
+  height: calc(100% - 240px);
   pointer-events: none;
   overflow: visible;
 }
 
-/* 选定某一年时数字下面多一行同比 */
 .hero-card:has(.hero-delta) .route-backdrop {
-  top: 164px;
-  height: calc(100% - 234px);
+  top: 158px;
+  height: calc(100% - 268px);
+}
+
+@media (min-width: 760px) {
+  .hero-card {
+    padding: 34px 36px 32px;
+    min-height: 400px;
+  }
+
+  .hero-card .route-backdrop,
+  .hero-card:has(.hero-delta) .route-backdrop {
+    inset: 14px 14px 14px auto;
+    width: 72%;
+    height: calc(100% - 28px);
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 24%);
+    mask-image: linear-gradient(90deg, transparent, #000 24%);
+  }
+
+  .hero-facts {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 
 .backdrop-route {
@@ -2689,13 +2810,12 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 }
 
 .hero-figure .value {
-  font-feature-settings: "tnum";
   background: var(--hero-text);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
   padding-bottom: 0.08em;
-  font-size: clamp(2.8rem, 7vw, 4.4rem);
+  font-size: clamp(3.4rem, 7.4vw, 5.6rem);
   font-weight: 750;
   letter-spacing: -0.035em;
   line-height: 1;
@@ -2759,6 +2879,18 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+}
+
+@media (min-width: 700px) {
+  .tiles {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1120px) {
+  .tiles {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
 }
 
 .tile {
@@ -4211,7 +4343,6 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   .rail,
   .shell-map .rail,
   .glass,
-  .hud-filters,
   .fact,
   .year-head::before,
   .chart-tooltip,
@@ -4667,7 +4798,7 @@ a.record-card:hover,
 
 .aircraft-hero-art {
   width: 100%;
-  height: clamp(150px, 26vw, 280px);
+  height: clamp(160px, 29vw, 330px);
   filter: drop-shadow(0 14px 18px rgba(8, 24, 60, 0.4));
 }
 
@@ -4920,4 +5051,164 @@ a.record-card:hover,
   .theme-option small {
     display: none;
   }
+}
+
+/* ==========================================================================
+   展示字体：大数字、三字码、航班号、时刻、机型
+   ========================================================================== */
+
+.hud-hero .value,
+.hero-figure .value,
+.tile-value,
+.hud-stat .v,
+.year-head h2,
+.year-meta b,
+.iata,
+.iata-chip,
+.ticket-code,
+.ticket-end .time,
+.ticket-duration,
+.ticket-foot dd,
+.route-title,
+.record-card b,
+.airport-label,
+.map-tooltip b,
+.aircraft-hero h1,
+.aircraft-kpis b,
+.hangar-text b,
+.rank-count,
+.haul-val,
+.fact b,
+.input.big,
+.page-title {
+  font-family: var(--font-display);
+  font-stretch: var(--display-stretch);
+  font-weight: var(--display-weight);
+  letter-spacing: var(--display-tracking);
+}
+
+:root:not([data-theme="retro"]) :is(.page-title, .year-head h2, .aircraft-hero h1) {
+  font-weight: 700;
+}
+
+.ticket-code,
+.ticket-foot dd,
+.iata-chip,
+.rank-count,
+.ticket-end .time,
+.ticket-duration {
+  letter-spacing: 0.005em;
+}
+
+.airport-label,
+.input.big {
+  letter-spacing: 0.045em;
+  font-weight: 700;
+}
+
+.ticket-end .iata {
+  font-size: 2.5rem;
+  font-weight: calc(var(--display-weight) + 30);
+  line-height: 1;
+}
+
+/* 中文标题需要比数字更重一点 */
+:root[data-theme="retro"] :is(h1, h2, .page-title, .section-title) {
+  font-weight: 650;
+}
+
+:root[data-theme="retro"] :is(.year-head h2, .aircraft-hero h1) {
+  font-weight: var(--display-weight);
+}
+
+.ticket.compact .ticket-end .iata {
+  font-size: 1.85rem;
+}
+
+.ticket-end .time {
+  font-size: 1.1rem;
+}
+
+.ticket-foot dd {
+  font-size: 1rem;
+}
+
+.ticket-code {
+  font-size: 1.05rem;
+}
+
+.airport-label {
+  font-size: 0.8rem;
+}
+
+.iata-chip {
+  font-size: 0.8rem;
+}
+
+.tile-value {
+  font-size: 2.1rem;
+  line-height: 1.1;
+}
+
+.year-head h2 {
+  font-size: 2.2rem;
+  line-height: 1.1;
+}
+
+.aircraft-kpis b {
+  font-size: 1.7rem;
+}
+
+.aircraft-kpis b.date {
+  font-size: 1.25rem;
+}
+
+.hud-hero .value {
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.hero-figure .value {
+  letter-spacing: -0.012em;
+}
+
+.chips .chip,
+.column-chart text,
+.hm-col,
+.hm-row,
+.country .n {
+  font-family: var(--font-display);
+  font-stretch: var(--display-stretch);
+  font-weight: 600;
+}
+
+.chips .chip {
+  font-size: 0.95rem;
+}
+
+.column-chart .tick,
+.column-chart .xlabel,
+.column-chart .cap-label,
+.hm-col,
+.hm-row {
+  font-size: 13.5px;
+}
+
+@media (max-width: 420px) {
+  .ticket-end .iata {
+    font-size: 2.15rem;
+  }
+}
+
+.dimension-text {
+  font-family: var(--font-display);
+  font-stretch: var(--display-stretch);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.section-title .count,
+.form-section h2 .hint {
+  font-family: var(--font);
+  letter-spacing: 0;
 }

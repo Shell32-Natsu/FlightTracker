@@ -8,7 +8,7 @@ import { computeStats, featuredFlight, filterFlights, routeKey } from "../../sha
 import { FlightMap, type FlightMapHandle, type MapProjection, type RouteHover } from "../components/FlightMap";
 import { Starfield } from "../components/Starfield";
 import { FlightTicket, ticketFromFlight } from "../ticket/FlightTicket";
-import { YearFilter } from "../ui/YearFilter";
+import { YearTimeline } from "../components/YearTimeline";
 import { CountUp } from "../ui/CountUp";
 import { cityName, distanceParts, distanceValue, localToday } from "../lib/format";
 import { ErrorBox, Loading } from "../components/Status";
@@ -63,8 +63,11 @@ export function MapPage() {
         onHoverRoute={setHover}
       />
 
+      {/* 放大或平面地图时，压一层底色保证左上角的字看得清 */}
+      <div className="map-scrim" aria-hidden />
+
       <div className="hud">
-        <div className="hud-card glass">
+        <div className="hud-title">
           <div className="eyebrow">
             {filter.year ? `${filter.year} 年飞行` : "飞行足迹"}
             {DEMO && <span className="demo-pill">演示数据</span>}
@@ -82,19 +85,6 @@ export function MapPage() {
             <HudStat v={Math.round((stats?.durationMin ?? 0) / 60)} l="小时" />
           </div>
         </div>
-        {all.length > 0 && (
-          <div className="hud-filters">
-            <YearFilter
-              flights={all}
-              filter={filter}
-              onChange={(f) => {
-                setSelected(null);
-                setFilter(f);
-              }}
-              refData={ref.data}
-            />
-          </div>
-        )}
         {featured && (
           <div className="hud-latest glass">
             <div className="eyebrow">{featured.upcoming ? "下一段航班" : "最近一段"}</div>
@@ -108,6 +98,18 @@ export function MapPage() {
           </div>
         )}
       </div>
+
+      {all.length > 0 && (
+        <YearTimeline
+          flights={all}
+          filter={filter}
+          onChange={(f) => {
+            setSelected(null);
+            setFilter(f);
+          }}
+          refData={ref.data}
+        />
+      )}
 
       <div className="map-controls glass">
         <button
@@ -173,7 +175,9 @@ export function MapPage() {
 function HudStat({ v, l }: { v: number; l: string }) {
   return (
     <div className="hud-stat">
-      <div className="v">{v.toLocaleString()}</div>
+      <div className="v">
+        <CountUp value={v} />
+      </div>
       <div className="l">{l}</div>
     </div>
   );

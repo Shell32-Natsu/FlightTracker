@@ -77,7 +77,7 @@ export function RouteBackdrop({
   }, [flights, refData, path]);
 
   return (
-    <svg className="route-backdrop" viewBox={VIEW} preserveAspectRatio="xMidYMid meet" aria-hidden>
+    <svg className="route-backdrop" viewBox={VIEW} preserveAspectRatio="xMaxYMid meet" aria-hidden>
       <defs>
         <pattern id={`${id}-dots`} width="6.4" height="6.4" patternUnits="userSpaceOnUse">
           <circle cx="3.2" cy="3.2" r="1.55" style={{ fill: "var(--dot-land)" }} />

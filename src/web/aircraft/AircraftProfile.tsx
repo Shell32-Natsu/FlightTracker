@@ -2,8 +2,8 @@ import { useId, useMemo } from "react";
 import { profileFor } from "../../shared/aircraft";
 import type { RefData } from "../lib/refdata";
 import { useAirlineLogo } from "../lib/logos";
-import { profileGeometry } from "./geometry";
-import { isLight, liveryFor } from "./livery";
+import { profileGeometry, type ProfileGeometry } from "./geometry";
+import { airlineAccent, isLight, liveryFor } from "./livery";
 
 interface Props {
   /** ICAO 机型代码 */
@@ -14,12 +14,14 @@ interface Props {
   className?: string;
   /** 画布内对齐方式：居中，或机头贴左 */
   align?: "center" | "left";
+  /** 蓝图式的尺寸标注（机身长度、垂尾高度） */
+  dimensions?: boolean;
 }
 
 const FONT = "'Inter Variable', 'Noto Sans SC Variable', system-ui, sans-serif";
 
 /** 带航司涂装的侧视图（矢量，自己画的）。 */
-export function AircraftProfile({ type, airline, refData, className, align = "center" }: Props) {
+export function AircraftProfile({ type, airline, refData, className, align = "center", dimensions }: Props) {
   const uid = useId().replace(/:/g, "");
   const logo = useAirlineLogo(airline);
   const g = useMemo(() => profileGeometry(profileFor(type, refData?.aircraft[type])), [type, refData]);
@@ -28,12 +30,13 @@ export function AircraftProfile({ type, airline, refData, className, align = "ce
     : { tail: "#e8ecf2", logo: "color" as const, titles: "", titleColor: "#000" };
   const id = (k: string) => `${uid}-${k}`;
   const [vx, vy, vw, vh] = g.viewBox;
+  const room = dimensions ? g.length * 0.062 : 0;
   const tailIsLight = isLight(liv.tail);
 
   return (
     <svg
       className={className}
-      viewBox={`${vx} ${vy} ${vw} ${vh}`}
+      viewBox={`${vx} ${vy} ${vw} ${vh + room}`}
       preserveAspectRatio={align === "left" ? "xMinYMid meet" : "xMidYMid meet"}
       role="img"
       aria-label={refData?.aircraft[type] ?? type}
@@ -45,9 +48,11 @@ export function AircraftProfile({ type, airline, refData, className, align = "ce
           <stop offset="1" stopColor="#cfd6df" />
         </linearGradient>
         <linearGradient id={id("shade")} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#fff" stopOpacity={0.35} />
-          <stop offset="0.5" stopColor="#fff" stopOpacity={0} />
-          <stop offset="1" stopColor="#0b1a33" stopOpacity={0.22} />
+          <stop offset="0" stopColor="#0b1a33" stopOpacity={0.1} />
+          <stop offset="0.16" stopColor="#fff" stopOpacity={0.5} />
+          <stop offset="0.34" stopColor="#fff" stopOpacity={0.12} />
+          <stop offset="0.58" stopColor="#0b1a33" stopOpacity={0.03} />
+          <stop offset="1" stopColor="#0b1a33" stopOpacity={0.42} />
         </linearGradient>
         <linearGradient id={id("metal")} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="#e4e8ee" />
@@ -70,11 +75,21 @@ export function AircraftProfile({ type, airline, refData, className, align = "ce
         </filter>
       </defs>
 
-      {/* 远侧平尾先画，被机身挡住一部分 */}
-      <path d={g.stabilizer} fill={`url(#${id("metal")})`} stroke="#8d97a5" strokeWidth={0.04} />
-
       {/* 垂尾 */}
       <path d={g.fin} fill={`url(#${id("fin")})`} stroke={tailIsLight ? "#b9c1cc" : "rgba(255,255,255,0.32)"} strokeWidth={0.06} />
+      {/* 白尾翼又取不到徽标时，给垂尾一道航司色的斜带 */}
+      {airline && tailIsLight && !logo.data && (
+        <g clipPath={`url(#${id("finclip")})`}>
+          <rect
+            x={g.logo.cx - g.logo.size * 2}
+            y={g.logo.cy - g.logo.size * 0.42}
+            width={g.logo.size * 4}
+            height={g.logo.size * 0.9}
+            fill={airlineAccent(airline)}
+            transform={`rotate(-32 ${g.logo.cx} ${g.logo.cy})`}
+          />
+        </g>
+      )}
       {airline && logo.data && (
         <g clipPath={`url(#${id("finclip")})`}>
           <image
@@ -89,13 +104,15 @@ export function AircraftProfile({ type, airline, refData, className, align = "ce
         </g>
       )}
 
+      <path d={g.rudder} fill="none" stroke={tailIsLight ? "#0b1a33" : "#fff"} strokeOpacity={0.16} strokeWidth={0.07} />
+
       {/* 机身 + 涂装色块 */}
       <path d={g.fuselage} fill={`url(#${id("body")})`} />
       <g clipPath={`url(#${id("clip")})`}>
         {liv.upper && <rect x={vx} y={vy} width={vw} height={g.upperY - vy} fill={liv.upper} />}
         {liv.stripe && <rect x={vx} y={g.upperY} width={vw} height={g.radius * 0.1} fill={liv.stripe} />}
         {liv.belly && <rect x={vx} y={g.bellyY} width={vw} height={g.radius * 2} fill={liv.belly} />}
-        <rect x={vx} y={vy} width={vw} height={vh} fill={`url(#${id("shade")})`} />
+        <rect x={vx} y={-g.top} width={vw} height={g.top + g.radius} fill={`url(#${id("shade")})`} />
         {g.doors.map((d, i) => (
           <rect
             key={i}
@@ -132,7 +149,9 @@ export function AircraftProfile({ type, airline, refData, className, align = "ce
       <path d={g.fuselage} fill="none" stroke="#9aa4b2" strokeWidth={0.05} />
       <path d={g.cockpit} fill="#1b2230" />
 
-      {/* 近侧机翼、发动机 */}
+      {/* 近侧平尾、整流罩、机翼、发动机 */}
+      <path d={g.stabilizer} fill={`url(#${id("metal")})`} stroke="#8d97a5" strokeWidth={0.05} strokeLinejoin="round" />
+      {g.fairing && <ellipse {...g.fairing} fill={liv.belly ?? "#c3cbd6"} stroke="#8d97a5" strokeOpacity={0.5} strokeWidth={0.04} />}
       <path d={g.wing} fill={`url(#${id("metal")})`} stroke="#8d97a5" strokeWidth={0.04} />
       {g.winglet && <path d={g.winglet} fill={liv.tail} stroke="#8d97a5" strokeWidth={0.04} />}
       {g.engines.map((e, i) => (
@@ -144,9 +163,30 @@ export function AircraftProfile({ type, airline, refData, className, align = "ce
           <ellipse cx={e.lip.cx + e.lip.rx * 0.35} cy={e.lip.cy} rx={e.lip.rx * 0.6} ry={e.lip.ry * 0.82} fill="#343c4a" />
         </g>
       ))}
+      {dimensions && <Dimensions g={g} y={vy + vh + room * 0.45} size={room * 0.4} />}
       {g.props.map((q, i) => (
         <ellipse key={i} cx={q.cx} cy={q.cy} rx={q.rx} ry={q.ry} fill="#8f99a8" opacity={0.28} />
       ))}
     </svg>
+  );
+}
+
+/** 机身长度的标注线：两端短竖线，中间断开写数字。 */
+function Dimensions({ g, y, size }: { g: ProfileGeometry; y: number; size: number }) {
+  const text = `${g.length.toFixed(1)} m`;
+  const gap = text.length * size * 0.36 + size * 0.5;
+  const mid = g.length / 2;
+  const line = { stroke: "#fff", strokeOpacity: 0.5, strokeWidth: size * 0.06 };
+  return (
+    <g>
+      <line x1={0} x2={mid - gap} y1={y} y2={y} {...line} />
+      <line x1={mid + gap} x2={g.length} y1={y} y2={y} {...line} />
+      {[0, g.length].map((x) => (
+        <line key={x} x1={x} x2={x} y1={y - size * 0.45} y2={y + size * 0.45} {...line} />
+      ))}
+      <text x={mid} y={y + size * 0.34} textAnchor="middle" fontSize={size} fill="#fff" fillOpacity={0.85} className="dimension-text">
+        {text}
+      </text>
+    </g>
   );
 }

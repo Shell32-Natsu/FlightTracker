@@ -1,3 +1,5 @@
+import frauncesCss from "@fontsource-variable/fraunces/opsz.css?raw";
+import instrumentCss from "@fontsource-variable/instrument-sans/standard.css?raw";
 import interCss from "@fontsource-variable/inter/index.css?raw";
 import notoCss from "@fontsource-variable/noto-sans-sc/index.css?raw";
 
@@ -16,6 +18,16 @@ const FONT_URLS: Record<string, string> = {
     import: "default",
     eager: true,
   }),
+  ...import.meta.glob<string>("/node_modules/@fontsource-variable/instrument-sans/files/*-standard-normal.woff2", {
+    query: "?url",
+    import: "default",
+    eager: true,
+  }),
+  ...import.meta.glob<string>("/node_modules/@fontsource-variable/fraunces/files/*-opsz-normal.woff2", {
+    query: "?url",
+    import: "default",
+    eager: true,
+  }),
   ...import.meta.glob<string>("/node_modules/@fontsource-variable/noto-sans-sc/files/*.woff2", {
     query: "?url",
     import: "default",
@@ -27,6 +39,8 @@ interface Face {
   family: string;
   file: string;
   url: string;
+  /** font-weight / font-stretch 的范围，照抄原样式，变体轴才生效 */
+  axes: string;
   rangeText: string;
   ranges: [number, number][];
 }
@@ -44,7 +58,10 @@ function parseFaces(css: string, pkg: string): Face[] {
       const [a, b] = r.trim().replace(/^U\+/i, "").split("-");
       return [parseInt(a, 16), parseInt(b ?? a, 16)];
     });
-    faces.push({ family, file, url, rangeText, ranges });
+    const axes = ["font-weight", "font-stretch"]
+      .map((k) => new RegExp(`${k}:\\s*[^;]+;`).exec(block)?.[0] ?? "")
+      .join("");
+    faces.push({ family, file, url, axes, rangeText, ranges });
   }
   return faces;
 }
@@ -53,6 +70,8 @@ let facesCache: Face[] | null = null;
 const allFaces = () =>
   (facesCache ??= [
     ...parseFaces(interCss, "@fontsource-variable/inter"),
+    ...parseFaces(instrumentCss, "@fontsource-variable/instrument-sans"),
+    ...parseFaces(frauncesCss, "@fontsource-variable/fraunces"),
     ...parseFaces(notoCss, "@fontsource-variable/noto-sans-sc"),
   ]);
 
@@ -66,10 +85,20 @@ async function toDataUrl(url: string): Promise<string> {
   return `data:font/woff2;base64,${btoa(binary)}`;
 }
 
-/** 生成只覆盖 text 里字符的 @font-face 样式（字体以 data URL 内嵌）。 */
-export async function embeddedFontCss(text: string): Promise<{ css: string; files: number; bytes: number }> {
+/**
+ * 生成只覆盖 text 里字符的 @font-face 样式（字体以 data URL 内嵌）。
+ * 给了 markup 时，只嵌其中写到的字体。
+ */
+export async function embeddedFontCss(
+  text: string,
+  markup?: string,
+): Promise<{ css: string; files: number; bytes: number }> {
   const codepoints = new Set([...text].map((c) => c.codePointAt(0)!));
-  const needed = allFaces().filter((f) => [...codepoints].some((cp) => f.ranges.some(([a, b]) => cp >= a && cp <= b)));
+  const needed = allFaces().filter(
+    (f) =>
+      (!markup || markup.includes(f.family)) &&
+      [...codepoints].some((cp) => f.ranges.some(([a, b]) => cp >= a && cp <= b)),
+  );
   const blocks = await Promise.all(
     needed.map(async (f) => {
       let p = dataUrlCache.get(f.file);
@@ -79,7 +108,7 @@ export async function embeddedFontCss(text: string): Promise<{ css: string; file
       }
       const url = await p;
       return {
-        css: `@font-face{font-family:'${f.family}';font-style:normal;font-weight:100 900;src:url(${url}) format('woff2');unicode-range:${f.rangeText};}`,
+        css: `@font-face{font-family:'${f.family}';font-style:normal;${f.axes}src:url(${url}) format('woff2');unicode-range:${f.rangeText};}`,
         bytes: url.length,
       };
     }),
@@ -98,7 +127,7 @@ export async function svgToPng(svg: SVGSVGElement, scale = 3): Promise<Blob> {
   clone.setAttribute("width", String(width));
   clone.setAttribute("height", String(height));
   clone.removeAttribute("style");
-  const { css } = await embeddedFontCss(svg.textContent ?? "");
+  const { css } = await embeddedFontCss(svg.textContent ?? "", svg.outerHTML);
   const style = document.createElementNS("http://www.w3.org/2000/svg", "style");
   style.textContent = css;
   clone.insertBefore(style, clone.firstChild);

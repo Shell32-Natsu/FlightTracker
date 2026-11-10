@@ -9,7 +9,7 @@ import type { DistanceUnit } from "../lib/format";
 import type { RefData } from "../lib/refdata";
 import type { PosterData } from "./data";
 import type { PosterPalette } from "./palettes";
-import { FONT } from "./text";
+import { display, FONT } from "./text";
 
 /**
  * 飞行护照：护照内页风格的年度 / 生涯卡片。
@@ -353,7 +353,7 @@ export const PassportPoster = forwardRef<SVGSVGElement, PassportProps>(function 
       ))}
 
       {/* 国旗 */}
-      <g transform={`translate(${W / 2 - ((countries.length - 1) * 26) / 2} 632)`}>
+      <g transform={`translate(${W / 2 - ((countries.length - 1) * 26) / 2} 604)`}>
         {countries.map((c, i) => (
           <g key={c} transform={`translate(${i * 26} 0)`}>
             <circle r={18.5} fill={L.bg} />
@@ -375,10 +375,11 @@ export const PassportPoster = forwardRef<SVGSVGElement, PassportProps>(function 
       </g>
 
       {/* 撕线 */}
-      <line x1={0} x2={W} y1={684} y2={684} stroke={L.perforation} strokeWidth={1.4} strokeDasharray="6 6" />
+      <line x1={0} x2={W} y1={652} y2={652} stroke={L.perforation} strokeWidth={1.4} strokeDasharray="6 6" />
 
+      <g transform="translate(0 -30)">
       {/* 下半张底纹：去过的机场代码 */}
-      {Array.from({ length: 28 }, (_, i) => (
+      {Array.from({ length: 30 }, (_, i) => (
         <text
           key={i}
           x={-20 - (i % 3) * 18}
@@ -393,7 +394,7 @@ export const PassportPoster = forwardRef<SVGSVGElement, PassportProps>(function 
       ))}
 
       {/* 标题 */}
-      <text x={56} y={756} fontSize={year ? 50 : 43} fontWeight={600} letterSpacing={1} fill={L.title}>
+      <text x={56} y={756} fontSize={(year ? 54 : 48) * (palette.id === "paper" ? 0.88 : 1)} {...display(palette.id, 620)} letterSpacing={0.5} fill={L.title}>
         {title}
       </text>
       <rect x={58} y={778} width={30} height={16} rx={2} fill={L.strong} opacity={0.85} />
@@ -405,7 +406,7 @@ export const PassportPoster = forwardRef<SVGSVGElement, PassportProps>(function 
       <path d={PLANE} transform={`translate(${W - 89} 747) rotate(45) scale(20)`} fill="#fff" opacity={0.95} />
 
       {/* 航班数 */}
-      <text x={52} y={938} fontSize={132} fontWeight={800} letterSpacing={-4} fill={L.strong}>
+      <text x={52} y={938} fontSize={146} {...display(palette.id, 680)} letterSpacing={-2} fill={L.strong}>
         {stats.flights}
       </text>
       <text x={58} y={1004} fontSize={58} fontWeight={400} fill={L.label}>
@@ -433,7 +434,7 @@ export const PassportPoster = forwardRef<SVGSVGElement, PassportProps>(function 
           <text x={statX[i]} y={1060} fontSize={25} fill={L.label}>
             {s.label}
           </text>
-          <text x={statX[i]} y={1110} fontSize={46} fontWeight={700} fill={L.strong} letterSpacing={-0.5}>
+          <text x={statX[i]} y={1110} fontSize={palette.id === "paper" ? 42 : 50} {...display(palette.id, 650)} fill={L.strong}>
             {s.parts.map((p, k) => (
               <tspan key={k}>
                 {p.value}
@@ -462,6 +463,7 @@ export const PassportPoster = forwardRef<SVGSVGElement, PassportProps>(function 
           {line}
         </text>
       ))}
+      </g>
     </svg>
   );
 });

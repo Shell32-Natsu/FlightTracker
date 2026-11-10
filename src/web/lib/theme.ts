@@ -24,6 +24,10 @@ export interface ThemeColors {
     routeTo: [number, number, number];
     /** 沿航线飞过的光点 */
     comet: [number, number, number];
+    /** 航线外发光强度 */
+    routeGlow: number;
+    /** 拱弧在地面的投影 */
+    routeShadow: string;
   };
   globe: {
     sphereFrom: string;
@@ -60,6 +64,8 @@ export const THEMES: Record<ThemeId, { name: string; desc: string; swatch: [stri
         airport: "#ffcf7a",
         selected: "#ffffff",
         comet: [255, 246, 222],
+        routeGlow: 1.3,
+        routeShadow: "rgba(2,6,16,0.55)",
         routeFrom: [255, 207, 122],
         routeTo: [255, 122, 92],
       },
@@ -96,6 +102,8 @@ export const THEMES: Record<ThemeId, { name: string; desc: string; swatch: [stri
         airport: "#d06a00",
         selected: "#0f172a",
         comet: [196, 52, 24],
+        routeGlow: 0,
+        routeShadow: "rgba(30,50,90,0.28)",
         routeFrom: [238, 140, 0],
         routeTo: [222, 70, 44],
       },
@@ -132,6 +140,8 @@ export const THEMES: Record<ThemeId, { name: string; desc: string; swatch: [stri
         airport: "#a8322a",
         selected: "#2d2217",
         comet: [122, 24, 18],
+        routeGlow: 0,
+        routeShadow: "rgba(70,45,20,0.32)",
         routeFrom: [194, 86, 30],
         routeTo: [152, 34, 28],
       },

@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { App } from "./App";
 import { DEMO } from "./lib/env";
 import "@fontsource-variable/inter";
+import "@fontsource-variable/instrument-sans/standard.css";
+import "@fontsource-variable/fraunces/opsz.css";
 import "./styles.css";
 
 // 演示版是纯静态托管（GitHub Pages），没有服务端回退到 index.html，

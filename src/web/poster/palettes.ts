@@ -10,11 +10,19 @@ export interface PosterPalette {
   id: PaletteId;
   name: string;
   bg: string;
-  /** 背景上的柔光，没有则为 null */
+  /** 背景渐变的另一端 */
+  bg2: string;
+  /** 登机牌卡片的底色 */
+  card: string;
+  /** 背景上的柔光（左上、右上），没有则为 null */
   glow: string | null;
+  glow2: string | null;
   ocean: string;
   land: string;
   visited: string;
+  /** 点阵地图：普通陆地、去过的国家 */
+  dot: string;
+  dotVisited: string;
   border: string;
   graticule: string;
   /** 单色模式下航线的起点色、终点色 */
@@ -25,6 +33,8 @@ export interface PosterPalette {
   airport: string;
   airportRing: string;
   text: string;
+  /** 主数字的渐变 */
+  hero: [string, string];
   muted: string;
   faint: string;
   accent: string;
@@ -41,21 +51,27 @@ export const PALETTES: Record<PaletteId, PosterPalette> = {
   night: {
     id: "night",
     name: "深色夜空",
-    bg: "#05080f",
-    glow: "rgba(88,120,255,0.16)",
-    ocean: "#0a1426",
-    land: "#131e33",
-    visited: "#1f3458",
-    border: "#1b2a45",
+    bg: "#060a14",
+    bg2: "#0c1733",
+    card: "#0e182e",
+    glow: "rgba(76,112,255,0.22)",
+    glow2: "rgba(255,184,77,0.14)",
+    ocean: "#0a1832",
+    land: "#1b2b4a",
+    visited: "#2c4e93",
+    dot: "#33497a",
+    dotVisited: "#5f8ae0",
+    border: "#2a3d63",
     graticule: "rgba(140,170,220,0.08)",
     routeFrom: "#ffd48a",
     routeTo: "#ff7a5c",
     routeGlow: true,
     airport: "#ffffff",
     airportRing: "#ffb84d",
-    text: "#eef2f8",
-    muted: "#9aa6ba",
-    faint: "#5d687c",
+    text: "#f2f5fb",
+    hero: ["#ffffff", "#ffd896"],
+    muted: "#a3aec2",
+    faint: "#66728a",
     accent: "#ffb84d",
     airlineColors: ["#3987e5", "#d95926", "#199e70"],
     other: "#6b7486",
@@ -66,50 +82,62 @@ export const PALETTES: Record<PaletteId, PosterPalette> = {
   paper: {
     id: "paper",
     name: "纸质复古",
-    bg: "#efe6d6",
+    bg: "#f0e6d0",
+    bg2: "#e6d7b6",
+    card: "#faf4e3",
     glow: null,
-    ocean: "#e4d9c3",
-    land: "#d7c8a9",
-    visited: "#c3a878",
-    border: "#efe6d6",
-    graticule: "rgba(90,70,40,0.13)",
-    routeFrom: "#a8472c",
-    routeTo: "#a8472c",
+    glow2: null,
+    ocean: "#bccabf",
+    land: "#f3e7c9",
+    visited: "#e0b675",
+    dot: "#c3ab7e",
+    dotVisited: "#b5733a",
+    border: "#b8975f",
+    graticule: "rgba(70,70,50,0.16)",
+    routeFrom: "#b8521f",
+    routeTo: "#93231b",
     routeGlow: false,
-    airport: "#2b2419",
-    airportRing: "#efe6d6",
-    text: "#2b2419",
-    muted: "#6f604b",
-    faint: "#a08f75",
-    accent: "#a8472c",
-    airlineColors: ["#256abf", "#d95926", "#199e70"],
-    other: "#9a8b73",
-    yearRamp: ["#d08a5e", "#c06a42", "#a8472c", "#83301f", "#5a1d13"],
+    airport: "#2d2217",
+    airportRing: "#faf4e3",
+    text: "#2d2217",
+    hero: ["#2d2217", "#6a3b20"],
+    muted: "#6a5640",
+    faint: "#927b5a",
+    accent: "#b24a22",
+    airlineColors: ["#1f4f9a", "#b8401a", "#0f6b4c"],
+    other: "#7d6f58",
+    yearRamp: ["#b5703f", "#a5552f", "#8c3a22", "#6b2718", "#4a160f"],
     stars: false,
-    frame: "#2b2419",
+    frame: "#2d2217",
   },
   light: {
     id: "light",
     name: "浅色简约",
-    bg: "#f4f6f9",
-    glow: null,
-    ocean: "#e7edf5",
-    land: "#ffffff",
-    visited: "#cfdcf0",
-    border: "#dde4ee",
-    graticule: "rgba(60,80,120,0.07)",
-    routeFrom: "#256abf",
-    routeTo: "#256abf",
+    bg: "#f3f7fd",
+    bg2: "#dce8f7",
+    card: "#ffffff",
+    glow: "rgba(84,134,255,0.16)",
+    glow2: "rgba(255,178,92,0.24)",
+    ocean: "#c8ddf4",
+    land: "#fafcfe",
+    visited: "#ffdca6",
+    dot: "#b3c6e2",
+    dotVisited: "#e8973a",
+    border: "#c3d1e4",
+    graticule: "rgba(255,255,255,0.5)",
+    routeFrom: "#e68600",
+    routeTo: "#d9432b",
     routeGlow: false,
     airport: "#101828",
     airportRing: "#ffffff",
     text: "#101828",
-    muted: "#5b6577",
-    faint: "#98a2b3",
-    accent: "#256abf",
-    airlineColors: ["#256abf", "#d95926", "#199e70"],
-    other: "#a3acba",
-    yearRamp: ["#6da7ec", "#3987e5", "#256abf", "#184f95", "#0d366b"],
+    hero: ["#101828", "#334155"],
+    muted: "#55617a",
+    faint: "#8490a6",
+    accent: "#d06a00",
+    airlineColors: ["#1d5fb4", "#c94a1c", "#0f7f58"],
+    other: "#7f8aa0",
+    yearRamp: ["#e0953a", "#d67a1e", "#bf5a10", "#97400f", "#6a2a0c"],
     stars: false,
     frame: null,
   },

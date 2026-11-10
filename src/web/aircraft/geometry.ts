@@ -16,10 +16,15 @@ export interface ProfileGeometry {
   viewBox: [number, number, number, number];
   length: number;
   radius: number;
+  /** 机身最高处离中心线的距离（驼峰 / 双层机型更高） */
+  top: number;
   fuselage: string;
   cockpit: string;
   fin: string;
   stabilizer: string;
+  rudder: string;
+  /** 翼身整流罩（下单翼才有） */
+  fairing: { cx: number; cy: number; rx: number; ry: number } | null;
   wing: string;
   winglet: string | null;
   engines: Nacelle[];
@@ -114,16 +119,25 @@ export function profileGeometry(s: ProfileSpec): ProfileGeometry {
 
   // 垂尾（带背鳍）
   const finH = s.finHeight;
-  const finBase = finH * (s.tTail ? 1 : 1.15);
+  const finBase = finH * (s.tTail ? 1 : 1.04);
   const x0 = L - D * 0.25 - finBase;
-  const topChord = finBase * (s.tTail ? 0.5 : 0.4);
+  const topChord = finBase * (s.tTail ? 0.5 : 0.38);
   // 垂尾后缘顶端大约在机尾正上方（T 尾更靠后）
   const sweep = L + D * (s.tTail ? 0.3 : 0.02) - topChord - x0;
   const finTopY = -R - finH;
+  // 翼尖前后缘都是圆角
+  const lead = (t: number) => p(x0 + sweep * t, -R - finH * t);
+  const tipX1 = x0 + sweep + topChord;
+  const trailX = L - D * 0.2;
+  const trailY = tailTopEnd - R * 0.05;
+  const trail = (t: number) => p(tipX1 + (trailX - tipX1) * t, finTopY + (trailY - finTopY) * t);
   const fin =
-    `M${p(x0 - D * 0.9, -R)} Q${p(x0 + D * 0.1, -R)} ${p(x0 + sweep * 0.22, -R - finH * 0.22)}` +
-    ` L${p(x0 + sweep, finTopY)} L${p(x0 + sweep + topChord, finTopY)}` +
-    ` L${p(L - D * 0.2, tailTopEnd - R * 0.05)} L${p(x0, -R * 0.9)} Z`;
+    `M${p(x0 - D * 0.9, -R)} Q${p(x0 + D * 0.1, -R)} ${lead(0.22)}` +
+    ` L${lead(0.93)} Q${lead(1)} ${p(x0 + sweep + topChord * 0.42, finTopY)}` +
+    ` L${p(tipX1 - topChord * 0.14, finTopY)} Q${p(tipX1, finTopY)} ${trail(0.06)}` +
+    ` L${p(trailX, trailY)} L${p(x0, -R * 0.9)} Z`;
+  // 方向舵的铰链线
+  const rudder = `M${p(tipX1 - topChord * 0.36, finTopY + finH * 0.04)} L${p(trailX - finBase * 0.3, trailY - R * 0.12)}`;
 
   // 平尾
   const stabilizer = s.tTail
@@ -133,12 +147,8 @@ export function profileGeometry(s: ProfileSpec): ProfileGeometry {
         [x0 + sweep + topChord + D * 0.45, finTopY + D * 0.1],
         [x0 + sweep + D * 0.2, finTopY + D * 0.14],
       ])
-    : poly([
-        [L - D * 2.6, -R * 0.08],
-        [L - D * 0.85, -R * 0.62],
-        [L - D * 0.45, -R * 0.6],
-        [L - D * 1.2, -R * 0.12],
-      ]);
+    : `M${p(L - D * 2.5, -R * 0.06)} L${p(L - D * 0.42, -R * 0.64)} Q${p(L - D * 0.22, -R * 0.7)} ${p(L - D * 0.08, -R * 0.6)}` +
+      ` L${p(L - D * 1.05, -R * 0.02)} Q${p(L - D * 1.6, R * 0.06)} ${p(L - D * 2.5, -R * 0.06)} Z`;
 
   // 机翼：侧视里是从机腹斜向后上方的一条
   const xw = s.wingAt * L;
@@ -253,10 +263,15 @@ export function profileGeometry(s: ProfileSpec): ProfileGeometry {
     viewBox: [r2(minX), r2(minY), r2(maxX - minX), r2(maxY - minY)],
     length: L,
     radius: R,
+    top: r2(-top),
     fuselage: d,
     cockpit,
     fin,
     stabilizer,
+    rudder,
+    fairing: high
+      ? null
+      : { cx: r2(xw + chord * 0.62), cy: r2(R * 0.84), rx: r2(chord * 1.05), ry: r2(R * 0.24) },
     wing,
     winglet,
     engines,
