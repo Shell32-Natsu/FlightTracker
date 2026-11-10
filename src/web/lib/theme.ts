@@ -22,8 +22,8 @@ export interface ThemeColors {
     /** 航线渐变：起点、终点 */
     routeFrom: [number, number, number];
     routeTo: [number, number, number];
-    /** 大气光晕的强度 */
-    atmosphere: number;
+    /** 沿航线飞过的光点 */
+    comet: [number, number, number];
   };
   globe: {
     sphereFrom: string;
@@ -34,6 +34,8 @@ export interface ThemeColors {
     land: string;
     border: string;
     route: string;
+    routeFrom: string;
+    routeTo: string;
     dotStroke: string;
     depDot: string;
   };
@@ -45,31 +47,33 @@ export const THEMES: Record<ThemeId, { name: string; desc: string; swatch: [stri
   night: {
     name: "夜航",
     desc: "深色星空，琥珀色航线",
-    swatch: ["#05080f", "#1c3157", "#ffb84d"],
+    swatch: ["#060a14", "#24457f", "#ffb84d"],
     colors: {
-      chrome: "#05080f",
+      chrome: "#060a14",
       map: {
-        ocean: "#07101f",
-        land: "#111c30",
-        visited: "#1c3157",
-        border: "#1e2c47",
-        visitedBorder: "#2f4a78",
-        graticule: "rgba(140,170,220,0.06)",
+        ocean: "#0a1832",
+        land: "#1a2a49",
+        visited: "#2a4a8a",
+        border: "#2a3d63",
+        visitedBorder: "#4a70b8",
+        graticule: "rgba(140,170,220,0.07)",
         airport: "#ffcf7a",
         selected: "#ffffff",
+        comet: [255, 246, 222],
         routeFrom: [255, 207, 122],
         routeTo: [255, 122, 92],
-        atmosphere: 1,
       },
       globe: {
-        sphereFrom: "#12213d",
-        sphereTo: "#070e1c",
+        sphereFrom: "#17305e",
+        sphereTo: "#081226",
         halo: "120,170,255",
         rim: "rgba(140,180,255,0.18)",
         graticule: "rgba(140,170,220,0.07)",
-        land: "#1a2944",
-        border: "#0c1628",
+        land: "#2c4678",
+        border: "#142443",
         route: "#ffb84d",
+        routeFrom: "#ffd48a",
+        routeTo: "#ff7a5c",
         dotStroke: "#0b111d",
         depDot: "#ffffff",
       },
@@ -79,31 +83,33 @@ export const THEMES: Record<ThemeId, { name: string; desc: string; swatch: [stri
   light: {
     name: "浅色",
     desc: "干净明亮，适合白天",
-    swatch: ["#f3f5f9", "#c9d8f2", "#ec8a0c"],
+    swatch: ["#eaf1fb", "#c4daf3", "#e07b00"],
     colors: {
       chrome: "#f3f5f9",
       map: {
-        ocean: "#e8eef6",
-        land: "#f8fafc",
-        visited: "#d3e0f5",
-        border: "#c6d2e3",
-        visitedBorder: "#9fb5d8",
-        graticule: "rgba(60,90,140,0.08)",
-        airport: "#e07b00",
+        ocean: "#c4daf3",
+        land: "#f7fafd",
+        visited: "#ffdca6",
+        border: "#c3d1e4",
+        visitedBorder: "#e3ab5c",
+        graticule: "rgba(255,255,255,0.5)",
+        airport: "#d06a00",
         selected: "#0f172a",
-        routeFrom: [245, 158, 11],
-        routeTo: [234, 88, 60],
-        atmosphere: 0.35,
+        comet: [196, 52, 24],
+        routeFrom: [238, 140, 0],
+        routeTo: [222, 70, 44],
       },
       globe: {
-        sphereFrom: "#f4f7fb",
-        sphereTo: "#dfe7f2",
+        sphereFrom: "#d9e8f9",
+        sphereTo: "#a9c8ea",
         halo: "90,130,200",
         rim: "rgba(60,90,140,0.22)",
-        graticule: "rgba(60,90,140,0.08)",
-        land: "#ffffff",
+        graticule: "rgba(255,255,255,0.45)",
+        land: "#fbfcfe",
         border: "#c6d2e3",
         route: "#ec8a0c",
+        routeFrom: "#ee8c00",
+        routeTo: "#de462c",
         dotStroke: "#ffffff",
         depDot: "#0f172a",
       },
@@ -113,31 +119,33 @@ export const THEMES: Record<ThemeId, { name: string; desc: string; swatch: [stri
   retro: {
     name: "复古",
     desc: "米色纸张，老地图的配色",
-    swatch: ["#efe5cf", "#c9a877", "#c2562a"],
+    swatch: ["#f1e7d0", "#b7c8bd", "#c2562a"],
     colors: {
       chrome: "#efe5cf",
       map: {
-        ocean: "#e6d8b8",
-        land: "#f4ebd6",
-        visited: "#dcc39a",
-        border: "#c4ad84",
-        visitedBorder: "#a88758",
-        graticule: "rgba(110,80,40,0.12)",
+        ocean: "#b7c8bd",
+        land: "#f4e8cb",
+        visited: "#e2ba7a",
+        border: "#c2a673",
+        visitedBorder: "#a3763b",
+        graticule: "rgba(70,70,50,0.16)",
         airport: "#a8322a",
         selected: "#2d2217",
-        routeFrom: [201, 104, 42],
-        routeTo: [160, 44, 36],
-        atmosphere: 0.25,
+        comet: [122, 24, 18],
+        routeFrom: [194, 86, 30],
+        routeTo: [152, 34, 28],
       },
       globe: {
-        sphereFrom: "#efe3c8",
-        sphereTo: "#dccaa3",
+        sphereFrom: "#cbd6c6",
+        sphereTo: "#9fb4a8",
         halo: "150,110,60",
         rim: "rgba(110,80,40,0.3)",
         graticule: "rgba(110,80,40,0.12)",
         land: "#f7efdc",
         border: "#c4ad84",
         route: "#c2562a",
+        routeFrom: "#c2561e",
+        routeTo: "#98221c",
         dotStroke: "#f7efdc",
         depDot: "#2d2217",
       },

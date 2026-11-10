@@ -74,7 +74,7 @@ export function AircraftProfile({ type, airline, refData, className, align = "ce
       <path d={g.stabilizer} fill={`url(#${id("metal")})`} stroke="#8d97a5" strokeWidth={0.04} />
 
       {/* 垂尾 */}
-      <path d={g.fin} fill={`url(#${id("fin")})`} stroke={tailIsLight ? "#b9c1cc" : "none"} strokeWidth={0.05} />
+      <path d={g.fin} fill={`url(#${id("fin")})`} stroke={tailIsLight ? "#b9c1cc" : "rgba(255,255,255,0.32)"} strokeWidth={0.06} />
       {airline && logo.data && (
         <g clipPath={`url(#${id("finclip")})`}>
           <image

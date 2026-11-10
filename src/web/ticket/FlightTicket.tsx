@@ -17,6 +17,7 @@ import {
   type DistanceUnit,
 } from "../lib/format";
 import { AirlineLogo } from "../ui/AirlineBadge";
+import { airlineAccent } from "../aircraft/livery";
 
 export interface TicketData {
   airline: string;
@@ -175,12 +176,13 @@ export function FlightTicket({ data: d, refData, unit = "km", to, compact, foote
   );
 
   const cls = `ticket${compact ? " compact" : ""} ${className}`;
+  const style = d.airline ? ({ "--air": airlineAccent(d.airline) } as React.CSSProperties) : undefined;
   return to ? (
-    <Link ref={ref as React.Ref<HTMLAnchorElement>} className={`${cls} interactive`} to={to}>
+    <Link ref={ref as React.Ref<HTMLAnchorElement>} className={`${cls} interactive`} style={style} to={to}>
       {body}
     </Link>
   ) : (
-    <div ref={ref as React.Ref<HTMLDivElement>} className={cls}>
+    <div ref={ref as React.Ref<HTMLDivElement>} className={cls} style={style}>
       {body}
     </div>
   );

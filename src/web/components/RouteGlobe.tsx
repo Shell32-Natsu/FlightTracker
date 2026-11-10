@@ -82,8 +82,8 @@ export function RouteGlobe({ world, dep, arr, fallbackCenter = [110, 25], width 
           <stop offset="1" stopColor={`rgba(${g.halo},0)`} />
         </radialGradient>
         <linearGradient id={`${id}-route`} gradientUnits="userSpaceOnUse" x1={pa?.[0] ?? 0} y1={pa?.[1] ?? 0} x2={pb?.[0] ?? 1} y2={pb?.[1] ?? 1}>
-          <stop offset="0" stopColor="#ffd48a" />
-          <stop offset="1" stopColor="#ff7a5c" />
+          <stop offset="0" stopColor={g.routeFrom} />
+          <stop offset="1" stopColor={g.routeTo} />
         </linearGradient>
         <filter id={`${id}-glow`} x="-50%" y="-50%" width="200%" height="200%">
           <feGaussianBlur stdDeviation="4" />
@@ -104,7 +104,7 @@ export function RouteGlobe({ world, dep, arr, fallbackCenter = [110, 25], width 
       )}
       {[
         [pa, dep?.code, g.depDot],
-        [pb, arr?.code, "#ff7a5c"],
+        [pb, arr?.code, g.routeTo],
       ].map(([p, code, color]) =>
         p ? (
           <g key={code as string} transform={`translate(${(p as number[])[0]},${(p as number[])[1]})`}>

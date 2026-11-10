@@ -51,8 +51,17 @@ export function localTimes(f: Flight, ref: RefData | undefined) {
 
 /** 数值 + 单位分开返回，便于排版（大号数字、小号单位）。 */
 export function distanceParts(km: number, unit: DistanceUnit): { value: string; unit: string } {
-  const v = unit === "km" ? km : kmToMiles(km);
-  return { value: Math.round(v).toLocaleString(), unit };
+  return { value: distanceValue(km, unit).toLocaleString(), unit };
+}
+
+export function distanceValue(km: number, unit: DistanceUnit): number {
+  return Math.round(unit === "km" ? km : kmToMiles(km));
+}
+
+/** 今天的日期（设备当地时间），YYYY-MM-DD */
+export function localToday(): string {
+  const d = new Date();
+  return [d.getFullYear(), d.getMonth() + 1, d.getDate()].map((n) => String(n).padStart(2, "0")).join("-");
 }
 
 const dateFmt = new Intl.DateTimeFormat("zh-CN", {

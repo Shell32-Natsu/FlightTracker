@@ -18,6 +18,8 @@ import { maplibregl } from "../lib/maplibre";
 import type { RefData } from "../lib/refdata";
 import { joinAntimeridian, unwrapGeometry } from "../lib/antimeridian";
 import { routeGradient } from "../lib/routeGradient";
+import { attachGlobeLight, globeView, isBehind, zoomToFit } from "./globeLight";
+import { attachRouteComets } from "./routeComets";
 import { THEMES, useThemeColors, type ThemeColors } from "../lib/theme";
 
 export type MapProjection = "globe" | "mercator";
@@ -58,20 +60,15 @@ function themePaint(map: MapLibreMap, c: ThemeColors["map"]) {
   map.setPaintProperty("airports-halo", "circle-color", c.airport);
   map.setPaintProperty("airports-dot", "circle-stroke-color", c.airport);
   map.setPaintProperty("airports-dot", "circle-color", c.ocean === C.ocean ? "#ffffff" : c.land);
-  map.setSky({
-    "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 0, c.atmosphere, 4, c.atmosphere * 0.9, 7, 0],
-  });
 }
 
 const EMPTY: FeatureCollection = { type: "FeatureCollection", features: [] };
 
-/** 底图样式：海洋底色随主题，其余图层加载后再加 */
+/** 底图样式：海洋底色随主题，其余图层加载后再加。大气由 globeLight 画，关掉 MapLibre 自带的（只亮一侧、浅色主题下会发白） */
 const styleFor = (c: ThemeColors["map"]): StyleSpecification => ({
   version: 8,
   projection: { type: "globe" },
-  sky: {
-    "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 0, c.atmosphere, 4, c.atmosphere * 0.9, 7, 0],
-  },
+  sky: { "atmosphere-blend": 0 },
   sources: {},
   layers: [{ id: "ocean", type: "background", paint: { "background-color": c.ocean } }],
 });
@@ -111,6 +108,9 @@ export const FlightMap = forwardRef<FlightMapHandle, Props>(function FlightMap(
 ) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
+  const lightRef = useRef<ReturnType<typeof attachGlobeLight> | null>(null);
+  const cometsRef = useRef<ReturnType<typeof attachRouteComets> | null>(null);
+  const globeRef = useRef(true);
   const [ready, setReady] = useState(false);
   const colors = useThemeColors();
   const colorsRef = useRef(colors.map);
@@ -142,9 +142,9 @@ export const FlightMap = forwardRef<FlightMapHandle, Props>(function FlightMap(
     const mobile = w < 600;
     const top = mobile ? Math.min(230, h * 0.28) : 0;
     const bottom = mobile ? 90 : 0;
-    // 宽屏时给左上角的统计面板让出一点位置
-    const left = w >= 1200 ? 220 : 0;
-    const diameter = mobile ? Math.min(w * 0.96, h - top - bottom) : Math.min(w, h) * 0.8;
+    // 宽屏时给左侧的面板让出位置
+    const left = w >= 1200 ? 300 : w >= 900 ? 260 : 0;
+    const diameter = mobile ? Math.min(w * 0.96, h - top - bottom) : Math.min(w - left, h) * 0.86;
     // 缩放级别 0 时地球周长为 512px
     const zoom = Math.log2((diameter * Math.PI) / 512);
     const home = homeRef.current;
@@ -178,6 +178,9 @@ export const FlightMap = forwardRef<FlightMapHandle, Props>(function FlightMap(
     });
     mapRef.current = map;
     map.setPadding(view.padding);
+    lightRef.current = attachGlobeLight(map);
+    // 系统要求减少动态效果时不放光点
+    if (!reducedMotion()) cometsRef.current = attachRouteComets(map);
     map.addControl(
       new maplibregl.AttributionControl({ compact: true, customAttribution: "Natural Earth · OurAirports" }),
       "bottom-right",
@@ -230,7 +233,7 @@ export const FlightMap = forwardRef<FlightMapHandle, Props>(function FlightMap(
         layout: { "line-cap": "round", "line-join": "round" },
         paint: {
           "line-gradient": routeGradient(0, 1),
-          "line-width": ["interpolate", ["linear"], ["get", "count"], 1, 1.3, 8, 3.2],
+          "line-width": ["interpolate", ["linear"], ["get", "count"], 1, 1.5, 8, 3.4],
         },
       });
       map.addLayer({
@@ -337,6 +340,9 @@ export const FlightMap = forwardRef<FlightMapHandle, Props>(function FlightMap(
       viewport?.removeEventListener("resize", syncSoon);
       map.off("idle", syncSize);
       for (const t of timers) clearTimeout(t);
+      lightRef.current?.remove();
+      cometsRef.current?.remove();
+      lightRef.current = cometsRef.current = null;
       map.remove();
       mapRef.current = null;
     };
@@ -346,6 +352,9 @@ export const FlightMap = forwardRef<FlightMapHandle, Props>(function FlightMap(
   useEffect(() => {
     if (!ready) return;
     mapRef.current!.setProjection({ type: projection });
+    globeRef.current = projection === "globe";
+    lightRef.current?.setVisible(globeRef.current);
+    cometsRef.current?.setGlobe(globeRef.current);
   }, [projection, ready]);
 
   // 国界
@@ -361,6 +370,7 @@ export const FlightMap = forwardRef<FlightMapHandle, Props>(function FlightMap(
     const map = mapRef.current!;
     (map.getSource("routes") as GeoJSONSource).setData(layers.routes);
     (map.getSource("airports") as GeoJSONSource).setData(layers.airports);
+    cometsRef.current?.setRoutes(layers.routes.features);
 
     const drawMs = reducedMotion() ? 0 : 2000;
     if (firstDraw.current) {
@@ -388,6 +398,7 @@ export const FlightMap = forwardRef<FlightMapHandle, Props>(function FlightMap(
     if (!ready) return;
     const map = mapRef.current!;
     themePaint(map, colors.map);
+    cometsRef.current?.setColor(colors.map.comet);
     // 首次绘制时航线由入场动画负责；之后换主题直接换成完整的新渐变
     if (paintedColors.current && paintedColors.current !== colors) {
       const { routeFrom, routeTo } = colors.map;
@@ -397,24 +408,59 @@ export const FlightMap = forwardRef<FlightMapHandle, Props>(function FlightMap(
     paintedColors.current = colors;
   }, [colors, ready]);
 
+  // 镜头是否正为选中的航线让位
+  const framed = useRef(false);
   // 选中航线：高亮并把镜头移过去（给详情面板留出位置）
   useEffect(() => {
     if (!ready) return;
     const map = mapRef.current!;
     map.setFilter("routes-selected", ["==", ["get", "key"], selectedRoute ?? ""]);
+    // 其余航线退到后面
+    map.setPaintProperty("routes-line", "line-opacity", selectedRoute ? 0.22 : 1);
+    map.setPaintProperty("routes-glow", "line-opacity", selectedRoute ? 0.15 : 1);
+    cometsRef.current?.setFocus(selectedRoute);
     const route = selectedRoute && layers.routes.features.find((f) => f.properties?.key === selectedRoute);
-    if (!route) return;
+    if (!route) {
+      // 面板关掉后，地球移回原来的位置
+      if (framed.current) map.easeTo({ padding: initialView().padding, duration: reducedMotion() ? 0 : 700 });
+      framed.current = false;
+      return;
+    }
     const bounds = new maplibregl.LngLatBounds();
     for (const c of route.geometry.coordinates) bounds.extend(c as [number, number]);
     const w = map.getContainer().clientWidth;
     const h = map.getContainer().clientHeight;
     const mobile = w < 900;
+    // 要让开的边距：上方统计、下方 / 右侧的详情面板
+    const want = mobile
+      ? { top: Math.min(210, h * 0.26), bottom: h * 0.52 + 30, left: 40, right: 40 }
+      : { top: 100, bottom: 80, left: w >= 1200 ? 380 : 60, right: 520 };
+    const duration = reducedMotion() ? 0 : 1400;
+    framed.current = true;
+    if (globeRef.current) {
+      // 地球上 fitBounds 遇到很大的边距会算偏（手机上甚至放不下、直接不动），自己算：
+      // 航线中点放到剩余区域正中，缩放到整条弧线刚好放得下
+      const coords = route.geometry.coordinates as [number, number][];
+      const mid = coords[coords.length >> 1];
+      const zoom = zoomToFit(coords, mid, w - want.left - want.right, h - want.top - want.bottom);
+      map.easeTo({
+        center: mid,
+        // 太长的航线也不把地球缩得太小，太短的不放得太大
+        zoom: Math.min(5, Math.max(initialView().zoom - 0.7, zoom)),
+        padding: want,
+        duration,
+        easing: easeOutCubic,
+        essential: true,
+      });
+      return;
+    }
+    // fitBounds 会在地图自带的内边距之外再加一遍，先减掉
+    const own = map.getPadding();
+    const rest = (side: keyof typeof want) => Math.max(0, want[side] - (own[side] ?? 0));
     map.fitBounds(bounds, {
-      padding: mobile
-        ? { top: Math.min(260, h * 0.3), bottom: h * 0.5 + 20, left: 40, right: 40 }
-        : { top: 120, bottom: 80, left: w >= 1200 ? 340 : 80, right: 520 },
+      padding: { top: rest("top"), bottom: rest("bottom"), left: rest("left"), right: rest("right") },
       maxZoom: 5,
-      duration: reducedMotion() ? 0 : 1400,
+      duration,
       essential: true,
     });
     // 只在选中变化时移动镜头；航线数据变化不重新定位
@@ -452,11 +498,10 @@ export const FlightMap = forwardRef<FlightMapHandle, Props>(function FlightMap(
     const layout = () => {
       raf = 0;
       const placed: { x: number; y: number }[] = [];
-      const transform = (map as unknown as { transform?: { isLocationOccluded?: (l: unknown) => boolean } })
-        .transform;
+      const view = globeRef.current ? globeView(map) : null;
       for (const it of items) {
         const pt = map.project(it.lngLat);
-        const occluded = transform?.isLocationOccluded?.(it.lngLat) ?? false;
+        const occluded = view ? isBehind(view, it.lngLat.lng, it.lngLat.lat) : false;
         const clash = placed.some((p) => Math.abs(p.x - pt.x) < 40 && Math.abs(p.y - pt.y) < 22);
         const show = !occluded && !clash;
         it.el.classList.toggle("hidden", !show);

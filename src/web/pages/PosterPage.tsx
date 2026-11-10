@@ -141,10 +141,12 @@ export function PosterPage() {
                   onClick={() => setTemplate(t.id)}
                   aria-pressed={template === t.id}
                 >
-                  <span
-                    className="template-shape"
-                    style={{ height: t.width > t.height ? 36 * (t.height / t.width) + 10 : 36, aspectRatio: `${t.width} / ${t.height}` }}
-                  />
+                  <span className="template-figure">
+                    <span
+                      className="template-shape"
+                      style={{ height: t.width > t.height ? 36 * (t.height / t.width) + 10 : 36, aspectRatio: `${t.width} / ${t.height}` }}
+                    />
+                  </span>
                   <b>{t.name}</b>
                   <small>{t.ratio}</small>
                 </button>

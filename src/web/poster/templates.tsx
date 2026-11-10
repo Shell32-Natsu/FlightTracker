@@ -6,7 +6,7 @@ import { formatDuration } from "../../shared/time";
 import { kmToMiles } from "../../shared/geo";
 import type { RefData } from "../lib/refdata";
 import { aircraftName, airlineName, CABIN_LABEL, cityName, formatDate, localTimes, type DistanceUnit } from "../lib/format";
-import { airlineHue } from "../ui/AirlineBadge";
+import { airlineAccent } from "../aircraft/livery";
 import type { PosterPalette } from "./palettes";
 import type { PosterData } from "./data";
 import { geoDistance } from "d3-geo";
@@ -317,7 +317,7 @@ export const FlightCard = forwardRef<SVGSVGElement, TemplateProps>(function Flig
   // 视角中心略向南偏，让航线呈上拱的弧线；偏移量随航线长度增加
   const angle = a && b ? geoDistance([a.lon, a.lat], [b.lon, b.lat]) : 0;
   const tilt = Math.min(14, ((angle * 180) / Math.PI) * 0.25);
-  const hue = airlineHue(flight.airline);
+  const accent = airlineAccent(flight.airline);
   const route = data.routes.slice(0, 1);
   const cells: [string, string][] = [
     ["机型", flight.aircraftType ? aircraftName(flight.aircraftType, refData).replace(/^(Boeing|Airbus) /, "") : "—"],
@@ -361,8 +361,8 @@ export const FlightCard = forwardRef<SVGSVGElement, TemplateProps>(function Flig
           </>
         ) : (
           <>
-            <rect width={52} height={52} rx={14} fill={`hsl(${hue} 42% ${p.id === "night" ? 17 : 88}%)`} stroke={`hsl(${hue} 45% ${p.id === "night" ? 30 : 72}%)`} />
-            <text x={26} y={33} textAnchor="middle" fontSize={17} fontWeight={800} fill={`hsl(${hue} ${p.id === "night" ? "90% 80%" : "60% 30%"})`}>
+            <rect width={52} height={52} rx={14} fill={accent} fillOpacity={p.id === "night" ? 0.45 : 0.14} stroke={accent} strokeOpacity={0.6} />
+            <text x={26} y={33} textAnchor="middle" fontSize={17} fontWeight={800} fill={p.id === "night" ? "#ffffff" : accent}>
               {flight.airline}
             </text>
           </>

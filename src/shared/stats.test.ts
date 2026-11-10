@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   computeStats,
+  featuredFlight,
   filterFlights,
   haulBreakdown,
   haulOf,
@@ -147,5 +148,37 @@ describe("大本营", () => {
     expect(resolveHomeAirport(data, "SFO", airports)).toBe("SFO");
     expect(resolveHomeAirport(data, "ZZZ", airports)).toBe("PVG");
     expect(resolveHomeAirport(data, null, airports)).toBe("PVG");
+  });
+});
+
+describe("featuredFlight", () => {
+  const past = flight({ flightDate: "2024-03-01" });
+  const morning = flight({
+    flightDate: "2024-05-01",
+    schedDepUtc: "2024-05-01T01:00:00Z",
+    schedArrUtc: "2024-05-01T03:00:00Z",
+  });
+  const evening = flight({
+    flightDate: "2024-05-01",
+    schedDepUtc: "2024-05-01T09:00:00Z",
+    schedArrUtc: "2024-05-01T12:00:00Z",
+  });
+  const all = [evening, past, morning];
+  it("取还没落地的最近一段", () => {
+    expect(featuredFlight(all, "2024-05-01T00:00:00Z", "2024-05-01")).toEqual({ flight: morning, upcoming: true });
+  });
+  it("当天已经落地的不算下一段", () => {
+    expect(featuredFlight(all, "2024-05-01T08:00:00Z", "2024-05-01")).toEqual({ flight: evening, upcoming: true });
+  });
+  it("没有时刻的航班按日期判断", () => {
+    const noTimes = flight({ flightDate: "2024-05-02" });
+    expect(featuredFlight([noTimes], "2024-05-02T10:00:00Z", "2024-05-02")?.upcoming).toBe(true);
+    expect(featuredFlight([noTimes], "2024-05-03T10:00:00Z", "2024-05-03")?.upcoming).toBe(false);
+  });
+  it("没有未来航班时取最近飞过的一段", () => {
+    expect(featuredFlight(all, "2024-06-01T00:00:00Z", "2024-06-01")).toEqual({ flight: evening, upcoming: false });
+  });
+  it("没有航班", () => {
+    expect(featuredFlight([], "2024-06-01T00:00:00Z", "2024-06-01")).toBeNull();
   });
 });

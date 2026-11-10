@@ -192,3 +192,24 @@ export function resolveHomeAirport(
   if (override && knownAirports[override]) return override;
   return mostVisitedAirport(flights);
 }
+
+/**
+ * 最值得放在首页的一段：还没落地的航班里最近的一段；没有就是最近飞过的一段。
+ * now 是 UTC 时刻（ISO），today 是设备当地日期；没记录时刻的航班按日期判断。
+ */
+export function featuredFlight(
+  flights: Flight[],
+  now: string,
+  today: string,
+): { flight: Flight; upcoming: boolean } | null {
+  const order = (a: Flight, b: Flight) =>
+    a.flightDate.localeCompare(b.flightDate) || (a.schedDepUtc ?? "").localeCompare(b.schedDepUtc ?? "");
+  const sorted = [...flights].sort(order);
+  const next = sorted.find((f) => {
+    const arr = f.actualArrUtc ?? f.schedArrUtc;
+    return arr ? arr > now : f.flightDate >= today;
+  });
+  if (next) return { flight: next, upcoming: true };
+  const last = sorted.at(-1);
+  return last ? { flight: last, upcoming: false } : null;
+}

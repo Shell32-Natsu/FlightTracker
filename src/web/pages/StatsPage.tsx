@@ -19,8 +19,8 @@ import {
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
-import { useFlights } from "../lib/api";
-import { useRefData, type RefData } from "../lib/refdata";
+import { useFlights, useSettings } from "../lib/api";
+import { useRefData, useWorldTopo, type RefData } from "../lib/refdata";
 import { useFilter } from "../lib/useFilter";
 import { useUnit } from "../lib/useUnit";
 import {
@@ -28,6 +28,7 @@ import {
   filterFlights,
   haulBreakdown,
   monthMatrix,
+  resolveHomeAirport,
   type Haul,
   type Ranked,
 } from "../../shared/stats";
@@ -35,10 +36,12 @@ import { kmToMiles } from "../../shared/geo";
 import type { Flight } from "../../shared/types";
 import { ColumnChart, type Column } from "../charts/ColumnChart";
 import { MonthHeatmap } from "../charts/MonthHeatmap";
+import { RouteBackdrop } from "../charts/RouteBackdrop";
 import { FlightTicket, ticketFromFlight } from "../ticket/FlightTicket";
 import { AircraftProfile } from "../aircraft/AircraftProfile";
 import { aircraftUsage } from "../aircraft/usage";
 import { YearFilter } from "../ui/YearFilter";
+import { CountUp } from "../ui/CountUp";
 import { Segmented } from "../ui/Segmented";
 import { AirlineLogo } from "../ui/AirlineBadge";
 import { Flag } from "../ui/Flag";
@@ -51,6 +54,7 @@ import {
   cityName,
   countryName,
   distanceParts,
+  distanceValue,
   type DistanceUnit,
 } from "../lib/format";
 
@@ -173,7 +177,10 @@ function StatsBody({
   prevKm: number | undefined;
 }) {
   const delta = prevKm ? (stats.distanceKm - prevKm) / prevKm : undefined;
-  const dist = distanceParts(stats.distanceKm, unit);
+  const world = useWorldTopo("110m");
+  const settings = useSettings();
+  const home = resolveHomeAirport(flights, settings.data?.homeAirport, refData.airports);
+  const homeLon = (home ? refData.airports[home]?.lon : undefined) ?? 110;
   const hours = stats.durationMin / 60;
   const avg = distanceParts(stats.distanceKm / stats.flights, unit);
   const matrix = useMemo(() => monthMatrix(flights), [flights]);
@@ -188,11 +195,13 @@ function StatsBody({
     <>
       <div className="stats-hero">
         <section className="card hero-card">
-          <HeroArc />
+          <RouteBackdrop flights={flights} refData={refData} world={world.data} centerLon={homeLon} />
           <div className="eyebrow">{year ? `${year} 年飞行里程` : "累计飞行里程"}</div>
           <div className="hero-figure">
-            <span className="value">{dist.value}</span>
-            <span className="unit">{dist.unit}</span>
+            <span className="value">
+              <CountUp value={distanceValue(stats.distanceKm, unit)} />
+            </span>
+            <span className="unit">{unit}</span>
           </div>
           {delta !== undefined && year !== undefined && (
             <div className="hero-delta">
@@ -701,32 +710,5 @@ function ShareRow({
         <span className="rank-fill" style={{ width: `${pct}%` }} />
       </span>
     </div>
-  );
-}
-
-/** 英雄卡片右上角的装饰航线。 */
-function HeroArc() {
-  return (
-    <svg className="hero-arc" viewBox="0 0 360 200" aria-hidden>
-      <defs>
-        <linearGradient id="hero-arc-g" x1="0" x2="1">
-          <stop offset="0" stopColor="#ffd48a" stopOpacity="0" />
-          <stop offset="0.5" stopColor="#ffd48a" stopOpacity="0.55" />
-          <stop offset="1" stopColor="#ff7a5c" stopOpacity="0.9" />
-        </linearGradient>
-      </defs>
-      <path d="M20 190 Q170 -30 340 120" fill="none" stroke="url(#hero-arc-g)" strokeWidth="1.6" />
-      <path d="M80 200 Q210 40 350 170" fill="none" stroke="url(#hero-arc-g)" strokeWidth="1" opacity="0.5" />
-      <path
-        d="M20 190 Q170 -30 340 120"
-        fill="none"
-        style={{ stroke: "rgb(var(--fg-rgb) / 0.12)" }}
-        strokeWidth="1"
-        strokeDasharray="2 6"
-        transform="translate(0 14)"
-      />
-      <circle cx="340" cy="120" r="3.5" fill="#ff7a5c" />
-      <circle cx="340" cy="120" r="10" fill="#ff7a5c" opacity="0.18" />
-    </svg>
   );
 }

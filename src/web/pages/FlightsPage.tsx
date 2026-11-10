@@ -1,4 +1,4 @@
-import { useDeferredValue, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronRight, Inbox, Plus, Search, Upload } from "lucide-react";
 import { useFlights } from "../lib/api";
@@ -138,12 +138,12 @@ export function FlightsPage() {
             const d = distanceParts(km, unit);
             return (
               <section key={year} className="year-group">
-                <div className="year-head">
+                <YearHead>
                   <h2>{year}</h2>
                   <span className="year-meta">
                     <b>{fs.length}</b> 段 · <b>{d.value}</b> {d.unit}
                   </span>
-                </div>
+                </YearHead>
                 <div className="ticket-grid">
                   {fs.map((f) => (
                     <FlightTicket
@@ -161,5 +161,22 @@ export function FlightsPage() {
         </>
       )}
     </div>
+  );
+}
+
+/** 吸顶的年份标题。前面放一个哨兵，哨兵滚出视口上沿就说明标题吸顶了，这时才加磨砂底。 */
+function YearHead({ children }: { children: React.ReactNode }) {
+  const sentinel = useRef<HTMLDivElement>(null);
+  const [stuck, setStuck] = useState(false);
+  useEffect(() => {
+    const io = new IntersectionObserver(([e]) => setStuck(!e.isIntersecting && e.boundingClientRect.top < 0));
+    io.observe(sentinel.current!);
+    return () => io.disconnect();
+  }, []);
+  return (
+    <>
+      <div ref={sentinel} className="year-sentinel" aria-hidden />
+      <div className={`year-head${stuck ? " stuck" : ""}`}>{children}</div>
+    </>
   );
 }

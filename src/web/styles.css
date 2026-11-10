@@ -6,6 +6,8 @@
    - 页面底下是一层固定的柔光背景（body::before，只绘制一次，滚动不重绘）
    - 卡片是“伪玻璃”：半透明渐变 + 顶部高光，透出柔光底色，不用 backdrop-filter
    - 真正的背景模糊只给少数浮在内容上的元素：底部 Dock、地图 HUD、提示框、吸顶标题、导入操作栏
+   - backdrop-filter 只写标准属性，-webkit- 前缀由构建补上；标准在前、前缀在后两个都写时，
+     压缩（Lightning CSS）会把标准属性丢掉，线上的模糊就不生效
    ========================================================================== */
 
 :root {
@@ -14,12 +16,12 @@
   /* 通道变量：rgb(var(--fg-rgb) / 0.06) 这样用，主题切换时一起变 */
   --fg-rgb: 255 255 255;
   --accent-rgb: 255 184 77;
-  --bg-rgb: 5 8 15;
+  --bg-rgb: 6 10 20;
   --shadow-rgb: 0 0 0;
 
   /* 平面 */
-  --bg: #05080f;
-  --surface-1: #0b111d;
+  --bg: #060a14;
+  --surface-1: #0b1220;
   --surface-2: #101828;
   --surface-3: #172135;
   --glass: rgba(12, 18, 32, 0.58);
@@ -28,12 +30,14 @@
   /* 玻璃顶边的高光 + 细微内发光 */
   --glass-edge: inset 0 1px 0 rgb(var(--fg-rgb) / 0.08), inset 0 0 0 1px rgb(var(--fg-rgb) / 0.02);
   /* 伪玻璃卡片 */
-  --card-bg: linear-gradient(180deg, rgba(22, 32, 52, 0.62), rgba(12, 18, 31, 0.5));
-  /* 页面柔光底：body::before 和票根缺口共用，保证对齐 */
+  --card-bg: linear-gradient(180deg, rgba(27, 39, 66, 0.56), rgba(14, 21, 38, 0.5));
+  /* 页面柔光底（body::before）。最上面一层极淡的噪点，避免大面积暗部渐变出现色带 */
   --ambient:
-    radial-gradient(70vmax 46vmax at 6% -10%, rgba(88, 120, 255, 0.17), transparent 70%),
-    radial-gradient(56vmax 40vmax at 104% 2%, rgb(var(--accent-rgb) / 0.1), transparent 70%),
-    radial-gradient(64vmax 46vmax at 72% 112%, rgba(64, 170, 220, 0.08), transparent 70%), var(--bg);
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .035 0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E"),
+    radial-gradient(90vmax 62vmax at 4% -14%, rgba(76, 112, 255, 0.2), rgba(76, 112, 255, 0.07) 42%, transparent 76%),
+    radial-gradient(74vmax 54vmax at 106% -8%, rgb(var(--accent-rgb) / 0.085), rgb(var(--accent-rgb) / 0.025) 44%, transparent 76%),
+    radial-gradient(90vmax 60vmax at 78% 118%, rgba(48, 150, 214, 0.13), rgba(48, 150, 214, 0.04) 44%, transparent 76%),
+    var(--bg);
   --line: rgb(var(--fg-rgb) / 0.07);
   --line-2: rgb(var(--fg-rgb) / 0.12);
   --line-3: rgb(var(--fg-rgb) / 0.2);
@@ -41,7 +45,7 @@
   /* 文字 */
   --text-1: #eef2f8;
   --text-2: #a8b2c3;
-  --text-3: #6b768a;
+  --text-3: #7d889d;
 
   /* 强调：琥珀（航线、品牌、主操作） */
   --gold: #ffb84d;
@@ -66,13 +70,43 @@
   --seg-on: #202c44;
   --ticket-bg: linear-gradient(180deg, rgba(20, 30, 48, 0.9), rgba(12, 19, 32, 0.86));
   --record-bg: linear-gradient(180deg, #121b2c, #0c1320);
-  --map-bg: radial-gradient(ellipse at 50% 45%, #0b1426 0%, #05080f 60%, #020409 100%);
+  --map-bg:
+    radial-gradient(60vmax 46vmax at 12% 0%, rgba(62, 92, 210, 0.2), transparent 72%),
+    radial-gradient(60vmax 46vmax at 100% 100%, rgba(36, 110, 170, 0.14), transparent 72%),
+    radial-gradient(ellipse at 56% 48%, #0c1730 0%, #070c19 56%, #04070f 100%);
   --globe-bg: radial-gradient(circle at 50% 50%, #0d1830, #05080f 75%);
   --hud-solid: rgba(10, 15, 27, 0.86);
   --map-label-ink: #fff;
   --map-label-bg: rgba(8, 13, 24, 0.75);
-  --hero-text: linear-gradient(180deg, #fff, #ffe2b0);
+  --hero-text: linear-gradient(180deg, #fff 20%, #ffd896);
   --logo-tile-edge: rgba(255, 255, 255, 0.6);
+  --logo-bg: #0f1728;
+  --field-bg: rgb(var(--fg-rgb) / 0.035);
+  --btn-bg: rgb(var(--fg-rgb) / 0.05);
+  --btn-hover: rgb(var(--fg-rgb) / 0.09);
+  /* 主按钮：渐变、顶边高光 */
+  --primary-bg: linear-gradient(145deg, var(--gold-2), var(--gold) 58%, var(--gold-3));
+  --primary-edge: inset 0 1px 0 rgb(255 255 255 / 0.42);
+  /* 航司品牌色在票面上的柔光强度，见 .ticket */
+  --air-wash: 21%;
+  --air-mix: #fff 38%;
+  /* 地图页的立体地球：外圈大气光晕、球面明暗（见 FlightMap） */
+  --globe-halo:
+    radial-gradient(closest-side at 46.5% 46.5%, rgba(122, 178, 255, 0.62) 62%, rgba(104, 160, 255, 0.4) 70%, rgba(84, 136, 255, 0.16) 80%, rgba(70, 110, 255, 0.05) 90%, transparent 100%);
+  --globe-shade:
+    radial-gradient(circle closest-side, transparent 91%, rgba(132, 186, 255, 0.1) 97%, rgba(176, 212, 255, 0.4) 100%),
+    radial-gradient(circle at 30% 22%, rgba(150, 190, 255, 0.16), transparent 46%),
+    radial-gradient(circle at 34% 28%, transparent 44%, rgba(3, 6, 16, 0.36) 74%, rgba(2, 4, 12, 0.74) 100%);
+  --map-label-shadow: 0 0 3px rgba(4, 8, 18, 0.95), 0 0 8px rgba(4, 8, 18, 0.9), 0 1px 2px rgba(4, 8, 18, 0.9);
+  /* 机库 / 机型页的“蓝图”底 */
+  --bp-line: rgba(150, 190, 255, 0.075);
+  --bp-glow: rgba(120, 165, 255, 0.3);
+  --bp-from: #24488c;
+  --bp-mid: #17316a;
+  --bp-to: #0d1e45;
+  --bp-ink: #17316a;
+  /* 点阵地图 */
+  --dot-land: rgb(150 180 235 / 0.26);
   /* 标题用的字体（复古主题换成衬线） */
   --font-display: var(--font);
 
@@ -119,22 +153,25 @@
   --surface-3: #eceff5;
   --glass: rgba(255, 255, 255, 0.72);
   --glass-strong: rgba(255, 255, 255, 0.9);
-  --glass-edge: 0 1px 2px rgba(15, 23, 42, 0.04), 0 6px 20px rgba(15, 23, 42, 0.05);
+  --glass-edge: 0 1px 2px rgba(22, 40, 80, 0.05), 0 8px 24px rgba(22, 40, 80, 0.06);
   --card-bg: #ffffff;
   --ambient:
-    radial-gradient(70vmax 46vmax at 6% -10%, rgba(99, 132, 255, 0.1), transparent 70%),
-    radial-gradient(56vmax 40vmax at 104% 2%, rgba(255, 184, 77, 0.12), transparent 70%), var(--bg);
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .1 0 0 0 0 .15 0 0 0 0 .3 0 0 0 .025 0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E"),
+    radial-gradient(90vmax 62vmax at 4% -14%, rgba(84, 134, 255, 0.17), rgba(84, 134, 255, 0.06) 44%, transparent 76%),
+    radial-gradient(74vmax 54vmax at 106% -8%, rgba(255, 178, 92, 0.2), rgba(255, 178, 92, 0.06) 44%, transparent 76%),
+    radial-gradient(90vmax 60vmax at 78% 118%, rgba(96, 178, 236, 0.16), transparent 72%),
+    var(--bg);
   --line: rgba(15, 23, 42, 0.08);
   --line-2: rgba(15, 23, 42, 0.12);
   --line-3: rgba(15, 23, 42, 0.22);
 
   --text-1: #0f172a;
   --text-2: #475569;
-  --text-3: #8a94a6;
+  --text-3: #687488;
 
-  --gold: #e07b00;
-  --gold-2: #f5a524;
-  --gold-3: #e8870b;
+  --gold: #c76500;
+  --gold-2: #f0981c;
+  --gold-3: #d97400;
   --gold-ink: #ffffff;
   --gold-wash: rgba(236, 138, 12, 0.1);
   --gold-glow: rgba(236, 138, 12, 0.28);
@@ -158,13 +195,35 @@
   --seg-on: #ffffff;
   --ticket-bg: #ffffff;
   --record-bg: linear-gradient(180deg, #ffffff, #f7f9fc);
-  --map-bg: radial-gradient(ellipse at 50% 45%, #ffffff 0%, #eef2f8 60%, #e3e9f2 100%);
+  --map-bg:
+    radial-gradient(60vmax 46vmax at 100% 0%, rgba(255, 190, 120, 0.22), transparent 72%),
+    radial-gradient(ellipse at 56% 46%, #ffffff 0%, #eaf1fb 52%, #d6e3f4 100%);
   --globe-bg: radial-gradient(circle at 50% 50%, #ffffff, #eef2f8 75%);
   --hud-solid: rgba(255, 255, 255, 0.9);
   --map-label-ink: #0f172a;
   --map-label-bg: rgba(255, 255, 255, 0.88);
   --hero-text: linear-gradient(180deg, #0f172a, #334155);
   --logo-tile-edge: rgba(15, 23, 42, 0.08);
+  --field-bg: rgba(255, 255, 255, 0.82);
+  --btn-bg: rgba(255, 255, 255, 0.86);
+  --btn-hover: #ffffff;
+  --primary-bg: linear-gradient(145deg, #ea8a12, #cf6c00 60%, #bd5d00);
+  --air-wash: 11%;
+  --air-mix: #fff 10%;
+  --globe-halo:
+    radial-gradient(closest-side at 50% 58%, rgba(40, 74, 130, 0.34) 58%, rgba(40, 74, 130, 0.16) 74%, transparent 96%);
+  --globe-shade:
+    radial-gradient(circle closest-side, transparent 90%, rgba(255, 255, 255, 0.32) 98%, rgba(255, 255, 255, 0.7) 100%),
+    radial-gradient(circle at 26% 18%, rgba(255, 255, 255, 0.3), transparent 42%),
+    radial-gradient(circle at 34% 28%, transparent 46%, rgba(44, 88, 160, 0.13) 78%, rgba(32, 70, 140, 0.34) 100%);
+  --map-label-shadow: 0 0 3px #fff, 0 0 6px rgba(255, 255, 255, 0.95), 0 0 10px rgba(255, 255, 255, 0.8);
+  --bp-line: rgba(255, 255, 255, 0.09);
+  --bp-glow: rgba(205, 226, 255, 0.5);
+  --bp-from: #5b98ea;
+  --bp-mid: #3470cb;
+  --bp-to: #2257ad;
+  --bp-ink: #1d4a99;
+  --dot-land: rgb(58 96 160 / 0.26);
 }
 
 /* ==========================================================================
@@ -186,16 +245,17 @@
   --glass-edge: 0 1px 0 rgba(255, 252, 240, 0.7) inset, 0 2px 0 rgba(70, 45, 20, 0.06);
   --card-bg: linear-gradient(180deg, #faf4e4, #f5ebd6);
   --ambient:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .22 0 0 0 0 .08 0 0 0 .2 0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E"),
     radial-gradient(80vmax 50vmax at 0% 0%, rgba(214, 160, 90, 0.16), transparent 70%),
     radial-gradient(60vmax 45vmax at 100% 100%, rgba(160, 90, 50, 0.1), transparent 70%),
-    repeating-linear-gradient(0deg, rgba(90, 60, 30, 0.018) 0 2px, transparent 2px 5px), var(--bg);
+    radial-gradient(120vmax 90vmax at 50% 40%, transparent 55%, rgba(120, 80, 40, 0.1) 100%), var(--bg);
   --line: rgba(70, 45, 20, 0.13);
   --line-2: rgba(70, 45, 20, 0.2);
   --line-3: rgba(70, 45, 20, 0.32);
 
   --text-1: #2d2217;
   --text-2: #6a5640;
-  --text-3: #9a8568;
+  --text-3: #826c4d;
 
   --gold: #c2562a;
   --gold-2: #d9822b;
@@ -226,18 +286,38 @@
   --seg-on: #fffaf0;
   --ticket-bg: linear-gradient(180deg, #fbf6e8, #f4ead3);
   --record-bg: linear-gradient(180deg, #faf4e4, #f1e5cb);
-  --map-bg: radial-gradient(ellipse at 50% 45%, #f6eedb 0%, #ebdfc3 60%, #decdab 100%);
+  --map-bg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .22 0 0 0 0 .08 0 0 0 .2 0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E"), radial-gradient(ellipse at 56% 46%, #f8f0dd 0%, #ecdfc2 58%, #d9c59e 100%);
   --globe-bg: radial-gradient(circle at 50% 50%, #f8f1e0, #e6d8b8 75%);
   --hud-solid: rgba(248, 241, 224, 0.92);
   --map-label-ink: #2d2217;
   --map-label-bg: rgba(250, 244, 228, 0.9);
   --hero-text: linear-gradient(180deg, #2d2217, #6a3b20);
   --logo-tile-edge: rgba(70, 45, 20, 0.12);
+  --field-bg: rgba(255, 252, 243, 0.66);
+  --btn-bg: rgba(255, 250, 238, 0.72);
+  --btn-hover: #fffaf0;
+  --logo-bg: #3b2a1c;
+  --air-wash: 12%;
+  --air-mix: #6a4a2a 24%;
+  --globe-halo:
+    radial-gradient(closest-side at 50% 57%, rgba(80, 50, 20, 0.36) 58%, rgba(80, 50, 20, 0.16) 74%, transparent 96%);
+  --globe-shade:
+    radial-gradient(circle closest-side, transparent 98.8%, rgba(96, 64, 30, 0.45) 99.3%, rgba(96, 64, 30, 0.6) 100%),
+    radial-gradient(circle at 26% 18%, rgba(255, 248, 226, 0.26), transparent 44%),
+    radial-gradient(circle at 34% 28%, transparent 46%, rgba(92, 62, 28, 0.15) 78%, rgba(78, 50, 20, 0.42) 100%);
+  --map-label-shadow: 0 0 3px #f7eeda, 0 0 6px rgba(247, 238, 218, 0.95), 0 0 9px rgba(247, 238, 218, 0.8);
+  --bp-line: rgb(255 250 235 / 0.08);
+  --bp-glow: rgba(240, 225, 190, 0.3);
+  --bp-from: #5d7f92;
+  --bp-mid: #3f6176;
+  --bp-to: #2f4a5c;
+  --bp-ink: #2f4a5c;
+  --dot-land: rgb(120 84 40 / 0.3);
   --font-display: "Songti SC", "STSong", "Noto Serif SC", "Source Han Serif SC", "Noto Serif CJK SC", Georgia, serif;
 }
 
 /* 复古：标题、机场代码、大数字用衬线字 */
-:root[data-theme="retro"] :is(h1, h2, .page-title, .section-title, .iata, .hud-hero .value, .kpi-value, .record-card b) {
+:root[data-theme="retro"] :is(h1, h2, .page-title, .section-title, .iata, .hud-hero .value, .hero-figure .value, .tile-value, .record-card b) {
   font-family: var(--font-display);
   letter-spacing: 0;
 }
@@ -308,6 +388,15 @@ h3 {
   font-feature-settings: "tnum";
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .muted {
   color: var(--text-2);
 }
@@ -353,7 +442,6 @@ h3 {
   border: 1px solid var(--line-2);
   box-shadow: var(--glass-edge), var(--shadow-l);
   backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
 }
 
 .dock-link {
@@ -390,10 +478,10 @@ h3 {
   display: grid;
   place-items: center;
   color: var(--gold-ink);
-  background: linear-gradient(145deg, var(--gold-2), var(--gold) 55%, var(--gold-3));
+  background: var(--primary-bg);
   box-shadow:
     0 8px 22px rgb(var(--accent-rgb) / 0.35),
-    inset 0 1px 0 rgb(var(--fg-rgb) / 0.45);
+    var(--primary-edge);
   transition: transform 0.2s var(--ease);
 }
 
@@ -442,7 +530,6 @@ h3 {
   .shell-map .rail {
     background: var(--rail-bg-solid);
     backdrop-filter: var(--glass-blur);
-    -webkit-backdrop-filter: var(--glass-blur);
   }
 
   .rail-brand {
@@ -458,10 +545,10 @@ h3 {
     display: grid;
     place-items: center;
     color: var(--gold-ink);
-    background: linear-gradient(145deg, var(--gold-2), var(--gold) 55%, var(--gold-3));
+    background: var(--primary-bg);
     box-shadow:
       0 8px 20px rgb(var(--accent-rgb) / 0.28),
-      inset 0 1px 0 rgb(var(--fg-rgb) / 0.45);
+      var(--primary-edge);
     transition:
       transform 0.2s var(--ease),
       box-shadow 0.2s;
@@ -471,7 +558,7 @@ h3 {
     transform: translateY(-1px);
     box-shadow:
       0 12px 28px rgb(var(--accent-rgb) / 0.4),
-      inset 0 1px 0 rgb(var(--fg-rgb) / 0.45);
+      var(--primary-edge);
   }
 
   .rail-add.active {
@@ -514,7 +601,8 @@ h3 {
 
   .rail-link.active {
     color: var(--text-1);
-    background: rgb(var(--fg-rgb) / 0.06);
+    background: linear-gradient(180deg, rgb(var(--accent-rgb) / 0.16), rgb(var(--accent-rgb) / 0.06));
+    box-shadow: inset 0 0 0 1px rgb(var(--accent-rgb) / 0.18);
   }
 
   .rail-link.active .rail-icon {
@@ -581,9 +669,9 @@ h3 {
 }
 
 .page-title {
-  font-size: 1.9rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-size: clamp(1.9rem, 3.2vw, 2.4rem);
+  font-weight: 750;
+  letter-spacing: -0.025em;
   line-height: 1.15;
 }
 
@@ -650,7 +738,7 @@ h3 {
   padding: 0 16px;
   border-radius: 12px;
   border: 1px solid var(--line-2);
-  background: rgb(var(--fg-rgb) / 0.04);
+  background: var(--btn-bg);
   color: var(--text-1);
   font-weight: 550;
   font-size: 0.92rem;
@@ -664,7 +752,7 @@ h3 {
 }
 
 .button:hover {
-  background: rgb(var(--fg-rgb) / 0.08);
+  background: var(--btn-hover);
   border-color: var(--line-3);
 }
 
@@ -675,16 +763,16 @@ h3 {
 .button.primary {
   border-color: transparent;
   color: var(--gold-ink);
-  background: linear-gradient(145deg, var(--gold-2), var(--gold) 60%, var(--gold-3));
+  background: var(--primary-bg);
   box-shadow:
     0 6px 18px rgb(var(--accent-rgb) / 0.25),
-    inset 0 1px 0 rgb(var(--fg-rgb) / 0.4);
+    var(--primary-edge);
 }
 
 .button.primary:hover {
   box-shadow:
     0 10px 24px rgb(var(--accent-rgb) / 0.35),
-    inset 0 1px 0 rgb(var(--fg-rgb) / 0.4);
+    var(--primary-edge);
 }
 
 .button.danger {
@@ -735,7 +823,7 @@ textarea.input {
   padding: 0 14px;
   border-radius: 12px;
   border: 1px solid var(--line-2);
-  background: rgb(var(--fg-rgb) / 0.03);
+  background-color: var(--field-bg);
   color: var(--text-1);
   font: inherit;
   transition:
@@ -765,7 +853,7 @@ textarea.input::placeholder {
 textarea.input:focus {
   outline: none;
   border-color: rgb(var(--accent-rgb) / 0.6);
-  background: rgb(var(--accent-rgb) / 0.04);
+  background-color: color-mix(in srgb, var(--gold) 6%, var(--field-bg));
   box-shadow: 0 0 0 4px rgb(var(--accent-rgb) / 0.1);
 }
 
@@ -809,7 +897,7 @@ input[type="date"].input.big {
 
 input[type="date"]::-webkit-calendar-picker-indicator,
 input[type="time"]::-webkit-calendar-picker-indicator {
-  filter: invert(0.75);
+  opacity: 0.55;
   cursor: pointer;
 }
 
@@ -877,7 +965,7 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   padding: 0 14px;
   border-radius: 17px;
   border: 1px solid var(--line-2);
-  background: rgb(var(--fg-rgb) / 0.03);
+  background: var(--btn-bg);
   color: var(--text-2);
   font-size: 0.85rem;
   font-weight: 550;
@@ -922,10 +1010,10 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 /* 航司徽标 */
 .airline-badge {
   --size: 30px;
-  /* 色相来自航司代码（--badge-h），明暗随主题 */
-  --badge-bg: hsl(var(--badge-h) 42% 17%);
-  --badge-line: hsl(var(--badge-h) 45% 28%);
-  --badge-ink: hsl(var(--badge-h) 90% 80%);
+  /* 航司强调色（--air），明暗随主题 */
+  --badge-bg: color-mix(in oklab, var(--air) 34%, #0c1322);
+  --badge-line: color-mix(in oklab, var(--air) 58%, #16203a);
+  --badge-ink: color-mix(in oklab, var(--air) 34%, #fff);
   flex-shrink: 0;
   display: inline-grid;
   place-items: center;
@@ -1102,6 +1190,9 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   --notch: 11px;
   /* 缺口圆心的纵向位置，由组件量出；默认在卡片外（无缺口） */
   --perf-y: -100px;
+  /* 航司品牌色：票面左上角的一片柔光和顶边的细线（见 FlightTicket） */
+  --air: var(--gold);
+  --air-ink: color-mix(in oklab, var(--air), var(--air-mix));
   position: relative;
   isolation: isolate;
   display: block;
@@ -1122,7 +1213,11 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   border-radius: inherit;
   border: 1px solid var(--line);
   background:
-    radial-gradient(420px 120px at 50% 0%, rgb(var(--accent-rgb) / 0.05), transparent 70%),
+    radial-gradient(
+      420px 150px at 0% 0%,
+      color-mix(in srgb, var(--air-ink) var(--air-wash), transparent),
+      transparent
+    ),
     var(--ticket-bg);
   box-shadow: var(--glass-edge);
   transition: border-color 0.25s;
@@ -1160,7 +1255,29 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 }
 
 .ticket.interactive:hover::before {
-  border-color: rgb(var(--accent-rgb) / 0.28);
+  border-color: color-mix(in srgb, var(--air-ink) 46%, transparent);
+}
+
+/* 顶边一道品牌色的细线，向右渐隐 */
+.ticket::after {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 18px;
+  right: 40%;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--air-ink), transparent);
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+.ticket.interactive:hover .ticket-plane {
+  transform: translate(calc(-50% + 5px), 0);
+}
+
+.ticket.interactive:active {
+  transform: scale(0.99);
 }
 
 .ticket-head {
@@ -1277,10 +1394,32 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 
 .ticket-path > svg path {
   fill: none;
-  stroke: var(--line-3);
-  stroke-width: 1.5;
-  stroke-dasharray: 3 5;
+  stroke: url(#route-gradient);
+  stroke-width: 1.8;
   stroke-linecap: round;
+}
+
+/* 航线两端的机场点 */
+.ticket-path::before,
+.ticket-path::after {
+  content: "";
+  position: absolute;
+  top: 25px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--gold-2);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold-2) 18%, transparent);
+}
+
+.ticket-path::before {
+  left: calc(2% - 3px);
+}
+
+.ticket-path::after {
+  right: calc(2% - 3px);
+  background: var(--coral);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--coral) 18%, transparent);
 }
 
 .ticket-plane {
@@ -1298,6 +1437,7 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   box-shadow:
     0 0 0 1px rgb(var(--accent-rgb) / 0.25),
     0 0 18px rgb(var(--accent-rgb) / 0.25);
+  transition: transform 0.35s var(--ease);
 }
 
 .ticket-plane svg {
@@ -1487,14 +1627,18 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   padding: 14px 16px;
   margin-bottom: 24px;
   border-radius: var(--radius);
-  background: linear-gradient(90deg, rgba(255, 122, 92, 0.14), rgba(255, 122, 92, 0.04));
-  border: 1px solid rgba(255, 122, 92, 0.25);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--coral) 17%, var(--surface-1)),
+    color-mix(in srgb, var(--coral) 5%, var(--surface-1))
+  );
+  border: 1px solid color-mix(in srgb, var(--coral) 25%, transparent);
   color: var(--text-1);
   transition: border-color 0.2s;
 }
 
 .pending-banner:hover {
-  border-color: rgba(255, 122, 92, 0.45);
+  border-color: color-mix(in srgb, var(--coral) 45%, transparent);
 }
 
 .pending-banner .icon-wrap {
@@ -1503,7 +1647,7 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   border-radius: 10px;
   display: grid;
   place-items: center;
-  background: rgba(255, 122, 92, 0.18);
+  background: color-mix(in srgb, var(--coral) 18%, transparent);
   color: var(--coral);
 }
 
@@ -1532,34 +1676,38 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   isolation: isolate;
 }
 
-/* 吸顶的磨砂条：一层模糊 + 一层与页面相同的固定柔光。
-   没吸顶时底下就是柔光，两层叠上去看不出来；吸顶后压住滚过的票根，底部渐隐 */
-.year-head::before,
-.year-head::after {
+/* 吸顶后（.stuck，由 YearHead 判断）才出现的磨砂底：压住滚过的票根，底部渐隐 */
+.year-head::before {
   content: "";
   position: absolute;
-  inset: 0 -12px;
+  inset: 0 -16px -10px;
   z-index: -1;
   pointer-events: none;
-  -webkit-mask-image: linear-gradient(180deg, #000 70%, transparent);
-  mask-image: linear-gradient(180deg, #000 70%, transparent);
+  background: linear-gradient(180deg, rgb(var(--bg-rgb) / 0.86), rgb(var(--bg-rgb) / 0.6));
+  backdrop-filter: blur(18px);
+  -webkit-mask-image: linear-gradient(180deg, #000 62%, transparent),
+    linear-gradient(90deg, transparent, #000 16px calc(100% - 16px), transparent);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(180deg, #000 62%, transparent),
+    linear-gradient(90deg, transparent, #000 16px calc(100% - 16px), transparent);
+  mask-composite: intersect;
+  opacity: 0;
+  transition: opacity 0.2s;
 }
 
-.year-head::before {
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+.year-head.stuck::before {
+  opacity: 1;
 }
 
-.year-head::after {
-  background: var(--ambient);
-  background-attachment: fixed;
-  opacity: 0.8;
+.year-sentinel {
+  height: 1px;
+  margin-bottom: -1px;
 }
 
 .year-head h2 {
-  font-size: 1.5rem;
+  font-size: 1.75rem;
   font-weight: 800;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
 }
 
 .year-head .year-meta {
@@ -1645,7 +1793,6 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   background: var(--glass);
   border: 1px solid var(--line-2);
   backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
   box-shadow: var(--glass-edge), var(--shadow);
 }
 
@@ -1690,6 +1837,7 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 
 .hud-hero {
   display: flex;
+  font-feature-settings: "tnum";
   align-items: baseline;
   gap: 6px;
   margin-top: 2px;
@@ -1805,20 +1953,82 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   background: rgb(var(--fg-rgb) / 0.04);
 }
 
+.hud-latest {
+  display: none;
+}
+
 @media (min-width: 900px) {
   .hud {
     top: 24px;
     left: 24px;
     right: auto;
-    max-width: 560px;
+    width: 312px;
+    max-height: calc(100% - 48px);
   }
 
   .hud-card {
+    align-self: stretch;
     padding: 20px 22px;
   }
 
   .hud-hero .value {
-    font-size: 2.8rem;
+    font-size: 3rem;
+  }
+
+  .hud-stats {
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+  }
+
+  /* 筛选收进一张和统计同宽的卡片，年份多了自动换行，不再压到地球上 */
+  .hud-filters {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 12px;
+    border-radius: var(--radius-l);
+    background: var(--glass);
+    border: 1px solid var(--line-2);
+    backdrop-filter: var(--glass-blur);
+    box-shadow: var(--glass-edge), var(--shadow);
+  }
+
+  .hud-filters .chips {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    max-height: 156px;
+    overflow: hidden auto;
+    padding: 0;
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+
+  .hud-filters .chip {
+    padding: 0;
+    border-radius: 10px;
+    background-color: rgb(var(--fg-rgb) / 0.03);
+    border-color: transparent;
+    box-shadow: none;
+  }
+
+  .hud-filters .chip:hover {
+    background-color: rgb(var(--fg-rgb) / 0.07);
+  }
+
+  .hud-filters .chip.on {
+    background: var(--primary-bg);
+    box-shadow: var(--primary-edge);
+  }
+
+  .hud-filters .select {
+    width: 100%;
+    max-width: none;
+    border-radius: 10px;
+    background-color: rgb(var(--fg-rgb) / 0.03);
+    border-color: transparent;
+    box-shadow: none;
   }
 
   .map-controls {
@@ -1827,16 +2037,75 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   }
 }
 
+/* 最近 / 下一段航班：屏幕够高才放 */
+@media (min-width: 900px) and (min-height: 660px) {
+  .hud-latest {
+    display: block;
+    border-radius: var(--radius-l);
+    overflow: hidden;
+  }
+
+  .hud-latest .eyebrow {
+    padding: 14px 16px 0;
+  }
+
+  .hud-latest .ticket {
+    border: 0;
+    border-radius: 0;
+  }
+
+  .hud-latest .ticket::before,
+  .hud-latest .ticket::after {
+    display: none;
+  }
+
+  .hud-latest .ticket.interactive:hover {
+    transform: none;
+    box-shadow: none;
+    background: rgb(var(--fg-rgb) / 0.04);
+  }
+}
+
+/* 地图里的标签用站点字体（MapLibre 自带样式会换成 Helvetica） */
+.flight-map.maplibregl-map {
+  font: inherit;
+}
+
+.globe-light {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.globe-halo {
+  background: var(--globe-halo);
+}
+
+.globe-shade {
+  border-radius: 50%;
+  background: var(--globe-shade);
+}
+
+.route-comets {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* 三字码直接写在地图上，靠描边光晕保证可读，不再用一个个小方块盖住航线 */
 .airport-label {
   pointer-events: none;
-  padding: 2px 6px;
-  border-radius: 6px;
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  padding: 0 3px;
+  font-size: 0.72rem;
+  font-weight: 750;
+  line-height: 1.3;
+  letter-spacing: 0.05em;
   color: var(--map-label-ink);
-  background: var(--map-label-bg);
-  border: 1px solid rgb(var(--fg-rgb) / 0.1);
+  text-shadow: var(--map-label-shadow);
   display: block;
   margin-bottom: 6px;
   white-space: nowrap;
@@ -1872,9 +2141,14 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 }
 
 .airport-label.home {
+  padding: 3px 8px;
+  border-radius: 8px;
   color: var(--gold-ink);
-  background: var(--gold);
-  border-color: var(--gold);
+  text-shadow: none;
+  background: var(--primary-bg);
+  box-shadow:
+    var(--primary-edge),
+    0 4px 14px rgb(var(--accent-rgb) / 0.45);
 }
 
 .map-tooltip {
@@ -1974,6 +2248,15 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 
 .maplibregl-ctrl-attrib a {
   color: var(--text-3) !important;
+}
+
+.maplibregl-ctrl-attrib-button {
+  background-color: transparent !important;
+  opacity: 0.6;
+}
+
+:root:not([data-theme]) .maplibregl-ctrl-attrib-button {
+  filter: invert(1);
 }
 
 .maplibregl-ctrl-bottom-right {
@@ -2277,7 +2560,7 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 }
 
 .globe-label {
-  fill: #fff;
+  fill: var(--text-1);
   font-size: 12px;
   font-weight: 750;
   letter-spacing: 0.04em;
@@ -2359,7 +2642,7 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 .hero-card {
   overflow: hidden;
   padding: 26px 26px 24px;
-  min-height: 220px;
+  min-height: 400px;
   display: flex;
   flex-direction: column;
   background:
@@ -2367,14 +2650,34 @@ input[type="time"]::-webkit-calendar-picker-indicator {
     radial-gradient(500px 240px at 0% 100%, rgba(88, 120, 255, 0.12), transparent 70%), var(--card-bg);
 }
 
-.hero-card .hero-arc {
+/* 让开上面的大数字和底部的小标签 */
+.route-backdrop {
   position: absolute;
-  right: -40px;
-  top: 10px;
-  width: 360px;
-  height: 200px;
-  opacity: 0.9;
+  inset: 136px 10px 70px 10px;
+  width: calc(100% - 20px);
+  height: calc(100% - 206px);
   pointer-events: none;
+  overflow: visible;
+}
+
+/* 选定某一年时数字下面多一行同比 */
+.hero-card:has(.hero-delta) .route-backdrop {
+  top: 164px;
+  height: calc(100% - 234px);
+}
+
+.backdrop-route {
+  stroke-width: 1.3;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  opacity: 0.9;
+  animation: draw-route 1.6s var(--ease) forwards;
+}
+
+.backdrop-dot {
+  fill: var(--surface-1);
+  stroke: var(--gold-2);
+  stroke-width: 1.3;
 }
 
 .hero-figure {
@@ -2386,7 +2689,13 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 }
 
 .hero-figure .value {
-  font-size: clamp(2.8rem, 7vw, 4.2rem);
+  font-feature-settings: "tnum";
+  background: var(--hero-text);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  padding-bottom: 0.08em;
+  font-size: clamp(2.8rem, 7vw, 4.4rem);
   font-weight: 750;
   letter-spacing: -0.035em;
   line-height: 1;
@@ -2430,7 +2739,8 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   height: 32px;
   padding: 0 12px;
   border-radius: 16px;
-  background: rgb(var(--fg-rgb) / 0.05);
+  background: color-mix(in srgb, var(--surface-1) 78%, transparent);
+  backdrop-filter: blur(6px);
   border: 1px solid var(--line);
   font-size: 0.82rem;
   color: var(--text-2);
@@ -2452,6 +2762,7 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 }
 
 .tile {
+  justify-content: center;
   padding: 16px 18px;
   border-radius: var(--radius);
   background: var(--card-bg);
@@ -2459,8 +2770,13 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   border: 1px solid var(--line);
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
   min-width: 0;
+  transition: border-color 0.2s;
+}
+
+.tile:hover {
+  border-color: var(--line-3);
 }
 
 .tile-label {
@@ -2472,7 +2788,11 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 }
 
 .tile-label svg {
-  color: var(--text-3);
+  box-sizing: content-box;
+  padding: 5px;
+  border-radius: 8px;
+  color: var(--gold);
+  background: var(--gold-wash);
 }
 
 .tile-value {
@@ -2602,7 +2922,6 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   border: 1px solid var(--line-2);
   box-shadow: var(--glass-edge), var(--shadow);
   backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
   font-size: 0.8rem;
   white-space: nowrap;
   transform: translate(-50%, calc(-100% - 10px));
@@ -2961,11 +3280,30 @@ input[type="time"]::-webkit-calendar-picker-indicator {
    设置
    ========================================================================== */
 
-.settings {
+.settings,
+.settings-col {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-width: 0;
+}
+
+.settings {
   max-width: 720px;
+}
+
+/* 宽屏两列：左边偏好，右边邮件和导出 */
+@media (min-width: 1180px) {
+  .settings {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    max-width: none;
+  }
+
+  .settings > .demo-note {
+    grid-column: 1 / -1;
+  }
 }
 
 .setting-row {
@@ -2992,7 +3330,7 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 
 @media (min-width: 640px) {
   .home-setting {
-    grid-template-columns: 240px minmax(0, 1fr);
+    grid-template-columns: minmax(150px, 0.72fr) minmax(0, 1fr);
     align-items: center;
   }
 }
@@ -3343,7 +3681,6 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   border: 1px solid var(--line-2);
   box-shadow: var(--glass-edge), var(--shadow);
   backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
 }
 
 @media (min-width: 900px) {
@@ -3366,9 +3703,36 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 }
 
 .check input {
-  width: 17px;
-  height: 17px;
-  accent-color: var(--gold);
+  width: 18px;
+  height: 18px;
+}
+
+/* 勾选框和滑杆：原生外观在深色主题下发灰，自己画 */
+.check input,
+.check-row input[type="checkbox"] {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: none;
+  margin: 0;
+  border-radius: 6px;
+  border: 1.5px solid var(--line-3);
+  background: var(--field-bg) center / 12px no-repeat;
+  cursor: pointer;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s;
+}
+
+.check input:checked,
+.check-row input[type="checkbox"]:checked {
+  border-color: transparent;
+  background-color: var(--gold);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231d1405' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 13 4.5 4.5L19 7'/%3E%3C/svg%3E");
+}
+
+:root[data-theme] .check input:checked,
+:root[data-theme] .check-row input[type="checkbox"]:checked {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 13 4.5 4.5L19 7'/%3E%3C/svg%3E");
 }
 
 .import-result {
@@ -3512,8 +3876,16 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 
 .template-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 8px;
+}
+
+.template-grid > * {
+  grid-column: span 2;
+}
+
+.template-grid > :nth-child(n + 4) {
+  grid-column: span 3;
 }
 
 .template-option {
@@ -3530,6 +3902,15 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   transition: all 0.2s;
 }
 
+/* 各种画幅的示意框放进同样高的格子里，文字才能对齐 */
+.template-figure {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 38px;
+  margin-bottom: 4px;
+}
+
 .template-option b {
   font-size: 0.78rem;
   font-weight: 600;
@@ -3542,12 +3923,11 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 }
 
 .template-shape {
-  height: 36px;
   max-width: 90%;
   border-radius: 4px;
   border: 1.5px solid currentColor;
+  background: rgb(var(--fg-rgb) / 0.05);
   opacity: 0.7;
-  margin-bottom: 4px;
 }
 
 .template-option:hover {
@@ -3651,7 +4031,7 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   overflow: hidden;
   box-shadow:
     0 0 0 1px var(--line-2),
-    0 30px 80px rgb(var(--shadow-rgb) / 0.55);
+    var(--shadow-l);
   touch-action: pan-y;
 }
 
@@ -3678,8 +4058,8 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 }
 
 /* —— 航线动画 —— */
-.template-grid.three {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+.template-grid.three > * {
+  grid-column: span 2;
 }
 
 .check-row {
@@ -3694,7 +4074,6 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 .check-row input {
   width: 18px;
   height: 18px;
-  accent-color: var(--gold);
 }
 
 .anim-frame {
@@ -3745,9 +4124,34 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 }
 
 .scrubber {
+  --p: 0%;
+  -webkit-appearance: none;
+  appearance: none;
   flex: 1;
   min-width: 0;
-  accent-color: var(--gold);
+  height: 18px;
+  margin: 0;
+  background: linear-gradient(90deg, var(--gold-2), var(--coral)) left center / var(--p) 4px no-repeat,
+    linear-gradient(rgb(var(--fg-rgb) / 0.14), rgb(var(--fg-rgb) / 0.14)) center / 100% 4px no-repeat;
+  cursor: pointer;
+}
+
+.scrubber::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 3px solid var(--gold);
+  background: #fff;
+  box-shadow: 0 2px 8px rgb(var(--shadow-rgb) / 0.4);
+}
+
+.scrubber::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 3px solid var(--gold);
+  background: #fff;
 }
 
 .player-time {
@@ -3785,23 +4189,21 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 /* —— 玻璃的降级 ——
    不支持背景模糊、或系统要求降低透明度时，浮层改用实色，保证文字可读 */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  :root {
+  :root,
+  :root[data-theme] {
     --glass: var(--glass-strong);
   }
 
   .dock {
     background: var(--dock-solid);
   }
-
-  .year-head::after {
-    opacity: 1;
-  }
 }
 
 @media (prefers-reduced-transparency: reduce) {
-  :root {
-    --glass: rgba(11, 17, 29, 0.96);
-    --glass-strong: rgba(11, 17, 29, 0.98);
+  :root,
+  :root[data-theme] {
+    --glass: var(--surface-1);
+    --glass-strong: var(--surface-1);
     --card-bg: linear-gradient(180deg, var(--surface-2), var(--surface-1));
   }
 
@@ -3809,19 +4211,20 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   .rail,
   .shell-map .rail,
   .glass,
+  .hud-filters,
+  .fact,
   .year-head::before,
   .chart-tooltip,
   .import-footer {
     backdrop-filter: none;
-    -webkit-backdrop-filter: none;
   }
 
   .dock {
     background: var(--dock-solid);
   }
 
-  .year-head::after {
-    opacity: 1;
+  .year-head::before {
+    background: var(--bg);
   }
 }
 
@@ -3865,7 +4268,7 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 }
 
 .inbox-address {
-  flex: 1 1 260px;
+  flex: 1 1 100%;
   min-width: 0;
   padding: 10px 14px;
   border-radius: 12px;
@@ -4122,7 +4525,18 @@ a.record-card:hover,
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 10px;
+  gap: 12px;
+}
+
+@media (min-width: 900px) {
+  .hangar-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .hangar-list .lead,
+  .hangar-list li:nth-child(2):last-child {
+    grid-column: 1 / -1;
+  }
 }
 
 .hangar-list a {
@@ -4140,11 +4554,12 @@ a.record-card:hover,
 }
 
 .hangar-list a {
-  --bp-line: rgba(255, 255, 255, 0.07);
   background:
     linear-gradient(var(--bp-line) 1px, transparent 1px) 0 0 / 22px 22px,
     linear-gradient(90deg, var(--bp-line) 1px, transparent 1px) 0 0 / 22px 22px,
-    linear-gradient(165deg, #3f7fd6 0%, #245cb4 60%, #1a4796 100%);
+    radial-gradient(90% 120% at 78% 0%, var(--bp-glow), transparent 64%),
+    linear-gradient(165deg, var(--bp-from) 0%, var(--bp-mid) 58%, var(--bp-to) 100%);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08);
 }
 
 .hangar-list a:hover {
@@ -4194,7 +4609,7 @@ a.record-card:hover,
 }
 
 .hangar-list .lead .hangar-art {
-  height: 110px;
+  height: 132px;
 }
 
 @media (max-width: 640px) {
@@ -4214,7 +4629,6 @@ a.record-card:hover,
 }
 
 .aircraft-hero {
-  --bp-line: rgba(255, 255, 255, 0.07);
   position: relative;
   display: grid;
   gap: 8px;
@@ -4225,9 +4639,9 @@ a.record-card:hover,
   background:
     linear-gradient(var(--bp-line) 1px, transparent 1px) 0 0 / 26px 26px,
     linear-gradient(90deg, var(--bp-line) 1px, transparent 1px) 0 0 / 26px 26px,
-    radial-gradient(120% 90% at 20% 0%, rgba(190, 215, 255, 0.45), transparent 60%),
-    linear-gradient(170deg, #4d8be0 0%, #2861bc 55%, #1a4796 100%);
-  box-shadow: var(--shadow);
+    radial-gradient(110% 90% at 24% 0%, var(--bp-glow), transparent 62%),
+    linear-gradient(170deg, var(--bp-from) 0%, var(--bp-mid) 55%, var(--bp-to) 100%);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08), var(--shadow);
 }
 
 .aircraft-maker {
@@ -4274,7 +4688,7 @@ a.record-card:hover,
 
 .livery-picker .chip.on {
   background: #fff;
-  color: #173f86;
+  color: var(--bp-ink);
 }
 
 .aircraft-kpis {
@@ -4418,15 +4832,15 @@ a.record-card:hover,
 }
 
 :root[data-theme="light"] .airline-badge {
-  --badge-bg: hsl(var(--badge-h) 70% 95%);
-  --badge-line: hsl(var(--badge-h) 45% 84%);
-  --badge-ink: hsl(var(--badge-h) 55% 34%);
+  --badge-bg: color-mix(in oklab, var(--air) 11%, #fff);
+  --badge-line: color-mix(in oklab, var(--air) 28%, #fff);
+  --badge-ink: color-mix(in oklab, var(--air) 82%, #101828);
 }
 
 :root[data-theme="retro"] .airline-badge {
-  --badge-bg: hsl(var(--badge-h) 30% 88%);
-  --badge-line: hsl(var(--badge-h) 25% 72%);
-  --badge-ink: hsl(var(--badge-h) 40% 28%);
+  --badge-bg: color-mix(in oklab, var(--air) 18%, #f3e8cf);
+  --badge-line: color-mix(in oklab, var(--air) 36%, #dcc9a2);
+  --badge-ink: color-mix(in oklab, var(--air) 72%, #2d2217);
 }
 
 /* 浅色 / 复古主题不画星空 */
@@ -4506,24 +4920,4 @@ a.record-card:hover,
   .theme-option small {
     display: none;
   }
-}
-
-/* 复古：机型页的“蓝图”换成褪色的石板蓝 */
-:root[data-theme="retro"] .aircraft-hero {
-  background:
-    linear-gradient(rgb(255 250 235 / 0.07) 1px, transparent 1px) 0 0 / 26px 26px,
-    linear-gradient(90deg, rgb(255 250 235 / 0.07) 1px, transparent 1px) 0 0 / 26px 26px,
-    radial-gradient(120% 90% at 20% 0%, rgba(240, 225, 190, 0.28), transparent 60%),
-    linear-gradient(170deg, #5d7f92 0%, #3f6176 55%, #2f4a5c 100%);
-}
-
-:root[data-theme="retro"] .hangar-list a {
-  background:
-    linear-gradient(rgb(255 250 235 / 0.07) 1px, transparent 1px) 0 0 / 22px 22px,
-    linear-gradient(90deg, rgb(255 250 235 / 0.07) 1px, transparent 1px) 0 0 / 22px 22px,
-    linear-gradient(165deg, #5d7f92 0%, #3f6176 60%, #2f4a5c 100%);
-}
-
-:root[data-theme="retro"] .livery-picker .chip.on {
-  color: #2f4a5c;
 }

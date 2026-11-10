@@ -1,5 +1,12 @@
 import type { RefData } from "../lib/refdata";
-import { airlineHue } from "../ui/AirlineBadge";
+
+/** 由航司代码生成稳定的色相（同一航司在各处颜色一致）。 */
+function airlineHue(code: string): number {
+  let h = 0;
+  for (const c of code) h = (h * 31 + c.charCodeAt(0)) % 360;
+  // 跳开和强调色（琥珀）太接近的色相，避免与数据高亮混淆
+  return (h * 7 + 190) % 360;
+}
 
 /** 简化的涂装：白色机身 + 垂尾颜色 + 尾翼徽标，再加几个常见的色块。 */
 export interface Livery {
@@ -50,6 +57,26 @@ const CURATED: Record<string, Curated> = {
   HU: { tail: "#c8102e", logo: "white", titles: "HAINAN AIRLINES", titleColor: "#c8102e" },
   BR: { tail: "#00664e", logo: "color", titles: "EVA AIR", titleColor: "#00664e", stripe: "#f29b00" },
 };
+
+/** 垂尾是白色、标题是黑灰的航司，涂装里挑不出品牌色，单独列出 */
+const ACCENT: Record<string, string> = {
+  JL: "#c8102e",
+  CA: "#d0021b",
+  MU: "#0a4fa3",
+  CZ: "#0a7cc4",
+  EK: "#d71921",
+  SQ: "#e0a526",
+  AF: "#0a3fa0",
+  KE: "#3f8fd2",
+  AA: "#0078d2",
+  AC: "#d8292f",
+  NZ: "#00a0b0",
+};
+
+/** 航司的强调色，用在票面上：常见航司取品牌色，其余按代码生成稳定的色相（和代码徽标一致）。 */
+export function airlineAccent(code: string): string {
+  return ACCENT[code] ?? CURATED[code]?.belly ?? CURATED[code]?.tail ?? `hsl(${airlineHue(code)} 55% 46%)`;
+}
 
 const hex = (n: number) => n.toString(16).padStart(2, "0");
 function toHex(r: number, g: number, b: number) {

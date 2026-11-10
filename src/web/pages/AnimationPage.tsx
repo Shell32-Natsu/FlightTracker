@@ -242,10 +242,12 @@ export function AnimationPage() {
                     onClick={() => setAspect(a)}
                     aria-pressed={aspect === a}
                   >
-                    <span
-                      className="template-shape"
-                      style={{ height: w > h ? 36 * (h / w) + 10 : 36, aspectRatio: `${w} / ${h}` }}
-                    />
+                    <span className="template-figure">
+                      <span
+                        className="template-shape"
+                        style={{ height: w > h ? 36 * (h / w) + 10 : 36, aspectRatio: `${w} / ${h}` }}
+                      />
+                    </span>
                     <b>{a === "9:16" ? "竖屏" : a === "1:1" ? "方形" : "横屏"}</b>
                     <small>{a}</small>
                   </button>
@@ -392,7 +394,10 @@ function Player({ scene, paused }: { scene: ReturnType<typeof createScene>; paus
       const k = px / scene.width;
       ctx.setTransform(k, 0, 0, k, 0, 0);
       scene.draw(ctx, tRef.current);
-      if (scrubRef.current) scrubRef.current.value = String(tRef.current);
+      if (scrubRef.current) {
+        scrubRef.current.value = String(tRef.current);
+        fillScrubber(scrubRef.current);
+      }
       if (timeRef.current)
         timeRef.current.textContent = `${fmtTime(tRef.current)} / ${fmtTime(scene.duration)}`;
     };
@@ -453,6 +458,7 @@ function Player({ scene, paused }: { scene: ReturnType<typeof createScene>; paus
           aria-label="进度"
           onInput={(e) => {
             tRef.current = Number(e.currentTarget.value);
+            fillScrubber(e.currentTarget);
             setPlaying(false);
             const canvas = canvasRef.current;
             const ctx = canvas?.getContext("2d");
@@ -481,4 +487,9 @@ function Player({ scene, paused }: { scene: ReturnType<typeof createScene>; paus
       </div>
     </>
   );
+}
+
+/** 滑杆已播放的部分填色（样式见 .scrubber） */
+function fillScrubber(el: HTMLInputElement) {
+  el.style.setProperty("--p", `${(Number(el.value) / (Number(el.max) || 1)) * 100}%`);
 }

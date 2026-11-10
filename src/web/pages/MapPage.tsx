@@ -4,12 +4,13 @@ import { useFlights, useSettings } from "../lib/api";
 import { useRefData, useWorldTopo } from "../lib/refdata";
 import { useFilter } from "../lib/useFilter";
 import { useUnit } from "../lib/useUnit";
-import { computeStats, filterFlights, routeKey } from "../../shared/stats";
+import { computeStats, featuredFlight, filterFlights, routeKey } from "../../shared/stats";
 import { FlightMap, type FlightMapHandle, type MapProjection, type RouteHover } from "../components/FlightMap";
 import { Starfield } from "../components/Starfield";
 import { FlightTicket, ticketFromFlight } from "../ticket/FlightTicket";
 import { YearFilter } from "../ui/YearFilter";
-import { cityName, distanceParts } from "../lib/format";
+import { CountUp } from "../ui/CountUp";
+import { cityName, distanceParts, distanceValue, localToday } from "../lib/format";
 import { ErrorBox, Loading } from "../components/Status";
 import { DEMO } from "../lib/env";
 
@@ -37,13 +38,13 @@ export function MapPage() {
     }
     return m;
   }, [shown]);
+  const featured = useMemo(() => featuredFlight(shown, new Date().toISOString(), localToday()), [shown]);
   const selectedFlights = selected ? (byRoute.get(selected) ?? []) : [];
 
   if (flights.error) return <ErrorBox error={flights.error} />;
   if (ref.error) return <ErrorBox error={ref.error} />;
   if (!ref.data || flights.isPending || settings.isPending) return <Loading label="正在准备地图" />;
 
-  const dist = distanceParts(stats?.distanceKm ?? 0, unit);
   const hovered = hover ? byRoute.get(hover.key) : undefined;
   const [ha, hb] = selected?.split("-") ?? [];
 
@@ -69,8 +70,10 @@ export function MapPage() {
             {DEMO && <span className="demo-pill">演示数据</span>}
           </div>
           <div className="hud-hero">
-            <span className="value">{dist.value}</span>
-            <span className="unit">{dist.unit}</span>
+            <span className="value">
+              <CountUp value={distanceValue(stats?.distanceKm ?? 0, unit)} />
+            </span>
+            <span className="unit">{unit}</span>
           </div>
           <div className="hud-stats">
             <HudStat v={stats?.flights ?? 0} l="航段" />
@@ -89,6 +92,18 @@ export function MapPage() {
                 setFilter(f);
               }}
               refData={ref.data}
+            />
+          </div>
+        )}
+        {featured && (
+          <div className="hud-latest glass">
+            <div className="eyebrow">{featured.upcoming ? "下一段航班" : "最近一段"}</div>
+            <FlightTicket
+              data={ticketFromFlight(featured.flight, ref.data)}
+              refData={ref.data}
+              unit={unit}
+              to={`/flights/${featured.flight.id}`}
+              compact
             />
           </div>
         )}

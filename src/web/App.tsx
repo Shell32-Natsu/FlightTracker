@@ -29,6 +29,14 @@ export function App() {
 
   return (
     <div className={`shell${isMap ? " shell-map" : ""}`}>
+      {/* 票面航线用的渐变：全站共用一份 */}
+      <svg width="0" height="0" style={{ position: "absolute" }} aria-hidden>
+        <linearGradient id="route-gradient">
+          <stop offset="0" style={{ stopColor: "var(--gold-2)" }} />
+          <stop offset="1" style={{ stopColor: "var(--coral)" }} />
+        </linearGradient>
+      </svg>
+
       <nav className="rail" aria-label="主导航">
         <NavLink to="/" className="rail-brand" aria-label="航迹">
           <Logo size={36} />

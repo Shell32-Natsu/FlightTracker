@@ -225,7 +225,7 @@ export function profileGeometry(s: ProfileSpec): ProfileGeometry {
       windows.push({ x: r2(x), y: r2(y - winH / 2), w: winW, h: winH });
     }
   };
-  addRow(first + doorW + 0.5, last + doorW + 0.8, winY);
+  addRow(first + doorW + 0.5, last, winY);
   if (s.doubleDeck) addRow(noseLen * 1.35, L - D * 3.4, top + D * 0.24);
   if (s.hump) addRow(noseLen * 1.45, s.hump * L - 0.3, top + D * 0.2);
 

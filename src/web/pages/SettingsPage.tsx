@@ -49,73 +49,77 @@ export function SettingsPage() {
             </div>
           </section>
         )}
-        <section className="card">
-          <div className="setting-row">
-            <div>
-              <h2 className="section-title">
-                <Ruler size={18} className="faint" /> 距离单位
-              </h2>
-              <p>地图、列表和统计里的里程显示</p>
-            </div>
-            <Segmented
-              value={unit}
-              onChange={setUnit}
-              ariaLabel="距离单位"
-              options={[
-                { value: "km", label: "公里" },
-                { value: "mi", label: "英里" },
-              ]}
-            />
-          </div>
-        </section>
-
-        <ThemeCard />
-
-        <HomeAirportSetting />
-
-        <EmailImportCard />
-
-        <ImportExportCard />
-
-        <section className="card">
-          <div className="setting-row">
-            <div>
-              <h2 className="section-title">
-                <Image size={18} className="faint" /> 海报与卡片
-              </h2>
-              <p>年度海报、生涯总览、单次航班卡片、手机壁纸，导出高清 PNG</p>
-            </div>
-            <Link to="/poster" className="button">
-              打开
-            </Link>
-          </div>
-        </section>
-
-        <section className="card">
-          <div className="setting-row">
-            <div>
-              <h2 className="section-title">
-                <Clapperboard size={18} className="faint" /> 航线动画
-              </h2>
-              <p>飞机沿真实航线飞过一次旅行或一整年，导出竖屏、方形或横屏短视频</p>
-            </div>
-            <Link to="/animation" className="button">
-              打开
-            </Link>
-          </div>
-        </section>
-
-        <section className="card">
-          <div className="setting-row">
-            <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
-              <Logo size={44} />
+        <div className="settings-col">
+          <section className="card">
+            <div className="setting-row">
               <div>
-                <h2 className="section-title">航迹</h2>
-                <p>个人航班记录 · 数据来自 OurAirports、OpenFlights、Natural Earth</p>
+                <h2 className="section-title">
+                  <Ruler size={18} className="faint" /> 距离单位
+                </h2>
+                <p>地图、列表和统计里的里程显示</p>
+              </div>
+              <Segmented
+                value={unit}
+                onChange={setUnit}
+                ariaLabel="距离单位"
+                options={[
+                  { value: "km", label: "公里" },
+                  { value: "mi", label: "英里" },
+                ]}
+              />
+            </div>
+          </section>
+
+          <ThemeCard />
+
+          <HomeAirportSetting />
+
+          <ImportExportCard />
+        </div>
+
+        <div className="settings-col">
+          <EmailImportCard />
+
+          <section className="card">
+            <div className="setting-row">
+              <div>
+                <h2 className="section-title">
+                  <Image size={18} className="faint" /> 海报与卡片
+                </h2>
+                <p>年度海报、生涯总览、单次航班卡片、手机壁纸，导出高清 PNG</p>
+              </div>
+              <Link to="/poster" className="button">
+                打开
+              </Link>
+            </div>
+          </section>
+
+          <section className="card">
+            <div className="setting-row">
+              <div>
+                <h2 className="section-title">
+                  <Clapperboard size={18} className="faint" /> 航线动画
+                </h2>
+                <p>飞机沿真实航线飞过一次旅行或一整年，导出竖屏、方形或横屏短视频</p>
+              </div>
+              <Link to="/animation" className="button">
+                打开
+              </Link>
+            </div>
+          </section>
+
+          <section className="card">
+            <div className="setting-row">
+              <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
+                <Logo size={44} />
+                <div>
+                  <h2 className="section-title">航迹</h2>
+                  <p>个人航班记录 · 数据来自 OurAirports、OpenFlights、Natural Earth</p>
+                </div>
               </div>
             </div>
-          </div>
-        </section>
+          </section>
+        </div>
       </div>
     </div>
   );
@@ -344,7 +348,15 @@ function ThemeCard() {
             >
               <span className="theme-preview" style={{ background: bg }}>
                 <svg viewBox="0 0 120 64" aria-hidden>
+                  <defs>
+                    <radialGradient id={`theme-ball-${id}`} cx="0.35" cy="0.3" r="0.8">
+                      <stop offset="0.2" stopColor="#fff" stopOpacity="0.28" />
+                      <stop offset="0.6" stopColor="#000" stopOpacity="0" />
+                      <stop offset="1" stopColor="#000" stopOpacity={id === "night" ? 0.6 : 0.24} />
+                    </radialGradient>
+                  </defs>
                   <circle cx="84" cy="40" r="30" fill={map} />
+                  <circle cx="84" cy="40" r="30" fill={`url(#theme-ball-${id})`} />
                   <path d="M20 46 Q56 6 96 30" fill="none" stroke={accent} strokeWidth="3" strokeLinecap="round" />
                   <circle cx="20" cy="46" r="3.5" fill={accent} />
                   <rect x="10" y="10" width="34" height="6" rx="3" fill={accent} opacity="0.85" />
