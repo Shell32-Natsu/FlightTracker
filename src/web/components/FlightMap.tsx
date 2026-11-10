@@ -40,6 +40,8 @@ interface Props {
   flights: Flight[];
   refData: RefData;
   world: Topology | undefined;
+  /** 国界加载失败：不用等它 */
+  worldFailed: boolean;
   projection: MapProjection;
   /** 设置里指定的“大本营”机场；null 时按起降次数自动选择 */
   homeAirport: string | null;
@@ -48,8 +50,10 @@ interface Props {
   onHoverRoute: (hover: RouteHover | null) => void;
 }
 
-/** 初始配色（夜航主题）；换主题时由下面的 effect 改写各图层的颜色 */
+/** 夜航主题的配色：只有它的机场点是纯白的 */
 const C = THEMES.night.colors.map;
+
+const dotColor = (c: ThemeColors["map"]) => (c.ocean === C.ocean ? "#ffffff" : c.land);
 
 /** 各图层随主题变化的颜色 */
 function themePaint(map: MapLibreMap, c: ThemeColors["map"]) {
@@ -61,7 +65,7 @@ function themePaint(map: MapLibreMap, c: ThemeColors["map"]) {
   map.setPaintProperty("routes-shadow", "line-color", c.routeShadow);
   map.setPaintProperty("airports-halo", "circle-color", c.airport);
   map.setPaintProperty("airports-dot", "circle-stroke-color", c.airport);
-  map.setPaintProperty("airports-dot", "circle-color", c.ocean === C.ocean ? "#ffffff" : c.land);
+  map.setPaintProperty("airports-dot", "circle-color", dotColor(c));
 }
 
 /** 地球：只留地面投影，航线由 routeArcs 画；平面地图：用线图层，选中时其余退到后面 */
@@ -92,6 +96,42 @@ function dotRadius(count: number): number {
   return DOT.r0 + (DOT.r1 - DOT.r0) * Math.min(1, Math.max(0, t));
 }
 
+/** 预热最多等这么久；国界数据最多等这么久 */
+const PRIME_TIMEOUT = 3000;
+const WORLD_TIMEOUT = 2500;
+
+const SOURCES = ["graticule", "countries", "routes", "airports"] as const;
+
+/** 等到所有数据源的瓦片都加载好、并且画过一帧；signal 中止后不再等，也不会完成 */
+function painted(map: MapLibreMap, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    const check = () => {
+      if (!SOURCES.every((s) => map.isSourceLoaded(s)) || !map.areTilesLoaded()) return;
+      map.off("render", check);
+      resolve();
+    };
+    map.on("render", check);
+    signal.addEventListener("abort", () => map.off("render", check));
+    map.triggerRepaint();
+  });
+}
+
+/** 等 GPU 把已经提交的活做完（着色器编译、上传、绘制都是排队异步执行的） */
+function gpuIdle(map: MapLibreMap): Promise<void> {
+  const gl = map.getCanvas().getContext("webgl2");
+  const sync = gl?.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+  if (!gl || !sync) return Promise.resolve();
+  gl.flush();
+  return new Promise((resolve) => {
+    const poll = () => {
+      if (!gl.isContextLost() && gl.clientWaitSync(sync, 0, 0) === gl.TIMEOUT_EXPIRED) return void setTimeout(poll, 16);
+      gl.deleteSync(sync);
+      resolve();
+    };
+    setTimeout(poll, 16);
+  });
+}
+
 const reducedMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 
 const easeOutCubic = (t: number) => 1 - (1 - t) ** 3;
@@ -113,7 +153,7 @@ function graticule(): FeatureCollection<LineString> {
 
 /** 交互航线地图：3D 地球 + 发光渐变航线 + 机场光点，不依赖外部瓦片。 */
 export const FlightMap = forwardRef<FlightMapHandle, Props>(function FlightMap(
-  { flights, refData, world, projection, homeAirport, selectedRoute, onSelectRoute, onHoverRoute },
+  { flights, refData, world, worldFailed, projection, homeAirport, selectedRoute, onSelectRoute, onHoverRoute },
   handle,
 ) {
   const container = useRef<HTMLDivElement>(null);
@@ -123,6 +163,9 @@ export const FlightMap = forwardRef<FlightMapHandle, Props>(function FlightMap(
   const globeRef = useRef(true);
   const selectedRef = useRef<string | null>(null);
   const [ready, setReady] = useState(false);
+  /** 预热完成：地图可以淡入、开始入场动画 */
+  const [primed, setPrimed] = useState(false);
+  const [worldLate, setWorldLate] = useState(false);
   const colors = useThemeColors();
   const colorsRef = useRef(colors.map);
   const paintedColors = useRef<ThemeColors | null>(null);
@@ -166,6 +209,14 @@ export const FlightMap = forwardRef<FlightMapHandle, Props>(function FlightMap(
     };
   };
 
+  /** 入场的起点：东边 70°、略远。不跨整数缩放级，免得动画中途换一批瓦片。 */
+  const entranceView = () => {
+    const view = initialView();
+    const [lon, lat] = view.center as [number, number];
+    const zoom = Math.min(view.zoom, Math.max(view.zoom - 0.4, Math.floor(view.zoom) + 0.01));
+    return { center: [lon + 70, lat] as LngLatLike, zoom, padding: view.padding };
+  };
+
   useImperativeHandle(handle, () => ({
     resetView: () => mapRef.current?.flyTo({ ...initialView(), pitch: 0, bearing: 0, duration: 1600 }),
     zoomBy: (d) => mapRef.current?.easeTo({ zoom: mapRef.current.getZoom() + d, duration: 300 }),
@@ -173,14 +224,12 @@ export const FlightMap = forwardRef<FlightMapHandle, Props>(function FlightMap(
 
   // 初始化地图（只做一次）
   useEffect(() => {
-    const view = initialView();
-    const [lon, lat] = view.center as [number, number];
+    const view = entranceView();
     const map = new maplibregl.Map({
       container: container.current!,
       style: styleFor(colorsRef.current),
-      // 入场：从东侧转过来并略微推近
-      center: [lon + 70, lat],
-      zoom: view.zoom - 0.4,
+      center: view.center,
+      zoom: view.zoom,
       attributionControl: false,
       renderWorldCopies: true,
       maxPitch: 0,
@@ -201,29 +250,34 @@ export const FlightMap = forwardRef<FlightMapHandle, Props>(function FlightMap(
     map.on("load", () => {
       // 版权信息默认收起成一个小图标
       map.getContainer().querySelector(".maplibregl-ctrl-attrib")?.classList.remove("maplibregl-compact-show");
-      map.addSource("graticule", { type: "geojson", data: graticule() });
-      map.addSource("countries", { type: "geojson", data: EMPTY });
-      map.addSource("routes", { type: "geojson", data: EMPTY, lineMetrics: true });
-      map.addSource("airports", { type: "geojson", data: EMPTY });
+      // 一开始就按当前主题、地球投影的最终样子建图层：先建后改会触发 300ms 的过渡，
+      // 白画十几帧，还要多编译着色器
+      const c = colorsRef.current;
+      for (const id of SOURCES)
+        map.addSource(id, {
+          type: "geojson",
+          data: id === "graticule" ? graticule() : EMPTY,
+          lineMetrics: id === "routes",
+        });
 
       map.addLayer({
         id: "graticule",
         type: "line",
         source: "graticule",
-        paint: { "line-color": C.graticule, "line-width": 1 },
+        paint: { "line-color": c.graticule, "line-width": 1 },
       });
       map.addLayer({
         id: "countries-fill",
         type: "fill",
         source: "countries",
-        paint: { "fill-color": ["case", ["get", "visited"], C.visited, C.land] },
+        paint: { "fill-color": ["case", ["get", "visited"], c.visited, c.land] },
       });
       map.addLayer({
         id: "countries-line",
         type: "line",
         source: "countries",
         paint: {
-          "line-color": ["case", ["get", "visited"], C.visitedBorder, C.border],
+          "line-color": ["case", ["get", "visited"], c.visitedBorder, c.border],
           "line-width": ["interpolate", ["linear"], ["zoom"], 1, 0.4, 5, 1],
         },
       });
@@ -233,7 +287,7 @@ export const FlightMap = forwardRef<FlightMapHandle, Props>(function FlightMap(
         type: "line",
         source: "routes",
         layout: { "line-cap": "round", "line-join": "round" },
-        paint: { "line-color": C.routeShadow, "line-width": 2.4, "line-blur": 2.2 },
+        paint: { "line-color": c.routeShadow, "line-width": 2.4, "line-blur": 2.2 },
       });
       map.addLayer({
         id: "routes-glow",
@@ -244,6 +298,7 @@ export const FlightMap = forwardRef<FlightMapHandle, Props>(function FlightMap(
           "line-gradient": routeGradient(0, 0.35),
           "line-width": ["interpolate", ["linear"], ["get", "count"], 1, 7, 8, 16],
           "line-blur": 7,
+          "line-opacity": 0,
         },
       });
       map.addLayer({
@@ -254,6 +309,7 @@ export const FlightMap = forwardRef<FlightMapHandle, Props>(function FlightMap(
         paint: {
           "line-gradient": routeGradient(0, 1),
           "line-width": ["interpolate", ["linear"], ["get", "count"], 1, 1.5, 8, 3.4],
+          "line-opacity": 0,
         },
       });
       map.addLayer({
@@ -262,7 +318,7 @@ export const FlightMap = forwardRef<FlightMapHandle, Props>(function FlightMap(
         source: "routes",
         filter: ["==", ["get", "key"], ""],
         layout: { "line-cap": "round", "line-join": "round" },
-        paint: { "line-color": C.selected, "line-width": 2.6, "line-opacity": 0.95 },
+        paint: { "line-color": c.selected, "line-width": 2.6, "line-opacity": 0 },
       });
       map.addLayer({
         id: "routes-hit",
@@ -275,7 +331,7 @@ export const FlightMap = forwardRef<FlightMapHandle, Props>(function FlightMap(
         type: "circle",
         source: "airports",
         paint: {
-          "circle-color": C.airport,
+          "circle-color": c.airport,
           "circle-opacity": 0.16,
           "circle-blur": 0.7,
           "circle-radius": ["interpolate", ["linear"], ["sqrt", ["get", "count"]], 1, 8, 6, 20],
@@ -287,8 +343,8 @@ export const FlightMap = forwardRef<FlightMapHandle, Props>(function FlightMap(
         type: "circle",
         source: "airports",
         paint: {
-          "circle-color": "#ffffff",
-          "circle-stroke-color": C.airport,
+          "circle-color": dotColor(c),
+          "circle-stroke-color": c.airport,
           "circle-stroke-width": 1.5,
           "circle-radius": DOT_RADIUS_EXPR as unknown as ExpressionSpecification,
           "circle-pitch-alignment": "map",
@@ -392,14 +448,61 @@ export const FlightMap = forwardRef<FlightMapHandle, Props>(function FlightMap(
     (mapRef.current!.getSource("countries") as GeoJSONSource).setData(countries);
   }, [countries, ready]);
 
-  // 航线和机场：更新数据并播放入场动画
-  const firstDraw = useRef(true);
+  // 航线和机场的数据
   useEffect(() => {
     if (!ready) return;
     const map = mapRef.current!;
     (map.getSource("routes") as GeoJSONSource).setData(layers.routes);
     (map.getSource("airports") as GeoJSONSource).setData(layers.airports);
     arcsRef.current?.setRoutes(layers.routes.features);
+  }, [layers, ready]);
+
+  // 国界迟迟不来就不等了
+  useEffect(() => {
+    if (!ready) return;
+    const t = setTimeout(() => setWorldLate(true), WORLD_TIMEOUT);
+    return () => clearTimeout(t);
+  }, [ready]);
+
+  // 预热：着色器编译、瓦片上传都发生在第一次画的时候，会卡住主线程。
+  // 先在看不见的时候把终点和起点两个视角各画一遍，入场动画里就只剩画面移动。
+  const canPrime = ready && (!!world || worldFailed || worldLate);
+  useEffect(() => {
+    if (!canPrime) return;
+    const map = mapRef.current!;
+    // 超时（很慢，或者页面切到了后台）就放弃：入场开始后不能再动镜头
+    const stop = new AbortController();
+    const { signal } = stop;
+    const timer = setTimeout(() => {
+      stop.abort();
+      if (!reducedMotion()) map.jumpTo(entranceView());
+      setPrimed(true);
+    }, PRIME_TIMEOUT);
+    void (async () => {
+      map.jumpTo(initialView());
+      await painted(map, signal);
+      if (!reducedMotion()) {
+        map.jumpTo(entranceView());
+        await painted(map, signal);
+      }
+      await gpuIdle(map);
+      if (signal.aborted) return;
+      clearTimeout(timer);
+      setPrimed(true);
+    })();
+    return () => {
+      stop.abort();
+      clearTimeout(timer);
+    };
+    // 只在能预热的那一刻做一次
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canPrime]);
+
+  // 航线的入场动画
+  const firstDraw = useRef(true);
+  useEffect(() => {
+    if (!primed) return;
+    const map = mapRef.current!;
 
     // 首次从容一些；之后换筛选、按年播放时快一点
     const drawMs = reducedMotion() ? 0 : firstDraw.current ? 2000 : 900;
@@ -415,13 +518,18 @@ export const FlightMap = forwardRef<FlightMapHandle, Props>(function FlightMap(
       const p = easeOutCubic(t);
       const c = colorsRef.current;
       arcsRef.current?.setProgress(p);
-      map.setPaintProperty("routes-line", "line-gradient", routeGradient(p, 1, c.routeFrom, c.routeTo));
-      map.setPaintProperty("routes-glow", "line-gradient", routeGradient(p, 0.35, c.routeFrom, c.routeTo));
+      // 地球上这两层是透明的，画完再一次改成完整的渐变
+      if (!globeRef.current || t === 1) {
+        map.setPaintProperty("routes-line", "line-gradient", routeGradient(p, 1, c.routeFrom, c.routeTo));
+        map.setPaintProperty("routes-glow", "line-gradient", routeGradient(p, 0.35, c.routeFrom, c.routeTo));
+      }
       if (t < 1) raf = requestAnimationFrame(step);
     };
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
-  }, [layers, ready]);
+    // 入场视角只用一次，不参与重播
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layers, primed]);
 
   // 换主题：改写各图层颜色（航线已画完时直接换成完整的新渐变）
   useEffect(() => {
@@ -550,7 +658,8 @@ export const FlightMap = forwardRef<FlightMapHandle, Props>(function FlightMap(
     };
   }, [layers, ready]);
 
-  return <div ref={container} className="flight-map" />;
+  // MapLibre 会往容器上加 class，状态用 data 属性，免得被 React 覆盖掉
+  return <div ref={container} className="flight-map" data-primed={primed || undefined} />;
 });
 
 function buildLayers(flights: Flight[], refData: RefData, homeOverride: string | null) {

@@ -1773,6 +1773,15 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 .map-page .flight-map {
   position: absolute;
   inset: 0;
+  /* 预热好了才淡入，见 FlightMap。不能是 0：完全透明的画布浏览器不显示也就不限速，会给 GPU 积压一堆帧 */
+  opacity: 0.01;
+  pointer-events: none;
+}
+
+.map-page .flight-map[data-primed] {
+  opacity: 1;
+  pointer-events: auto;
+  transition: opacity 0.6s var(--ease);
 }
 
 .map-page .maplibregl-canvas {

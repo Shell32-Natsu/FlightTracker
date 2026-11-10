@@ -205,7 +205,8 @@ export function attachRouteArcs(map: MapLibreMap, opts: { comets: boolean }): Ro
     last = now;
     const { ctx, canvas } = sparks;
     ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
-    if (comets.length < (selected ? 1 : MAX_COMETS) && now >= nextAt) {
+    // 航线画完才有光点
+    if (progress >= 1 && comets.length < (selected ? 1 : MAX_COMETS) && now >= nextAt) {
       spawn(now);
       nextAt = now + (selected ? 500 : 420 + Math.random() * 520);
     }
@@ -275,8 +276,6 @@ export function attachRouteArcs(map: MapLibreMap, opts: { comets: boolean }): Ro
       // 等 setProgress 从头画起，免得新航线先完整闪一帧
       progress = 0;
       sparks?.ctx.clearRect(0, 0, sparks.canvas.clientWidth, sparks.canvas.clientHeight);
-      // 等航线的入场动画画完
-      nextAt = performance.now() + 2200;
       draw();
     },
     setStyle(s) {
@@ -286,10 +285,10 @@ export function attachRouteArcs(map: MapLibreMap, opts: { comets: boolean }): Ro
     },
     setProgress(p) {
       progress = p;
-      draw();
+      // 跟着地图的下一帧一起画，不另画一遍
+      map.triggerRepaint();
     },
     setSelected(key) {
-      // 首次挂载时会带着 null 调一次，不能打断上面等入场动画的延时
       if (key === selected) return;
       selected = key;
       comets = key ? comets.filter((c) => c.arc.key === key) : comets;

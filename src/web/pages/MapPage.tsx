@@ -56,6 +56,7 @@ export function MapPage() {
         flights={shown}
         refData={ref.data}
         world={world.data}
+        worldFailed={world.isError}
         projection={projection}
         homeAirport={settings.data?.homeAirport ?? null}
         selectedRoute={selected}
